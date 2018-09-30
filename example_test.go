@@ -4,16 +4,22 @@ import (
 	"context"
 	"github.com/ajbeach2/worker"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"log"
+	"strings"
 )
 
 func Example() {
-	ctx, _ := context.WithCancel(context.Background())
-	conn := worker.NewConnection("https://sqs.us-east-1.amazonaws.com/88888888888/bucket")
+	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
+		return []byte(strings.ToLower(*m.Body)), nil
+	}
 
-	conn.Run(ctx,
-		func(m *sqs.Message) error {
-			log.Println(m)
-			return nil
-		})
+	w := worker.NewWorker(worker.WorkerConfig{
+		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		Workers:  1,
+		Region:   "us-east-1",
+		Handler:  handlerFunction,
+		Name:     "TestApp",
+	})
+
+	w.Run()
 }

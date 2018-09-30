@@ -2,61 +2,163 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
-	"log"
+	"go.uber.org/zap"
 	"sync"
+	"time"
 )
 
-type Callback func(m *sqs.Message) error
+const DefaultTimeout = 30
+const DefaultWorkers = 1
+const MaxNumberOfMessages = 10
+const VisibilityTimeout = 10
+const WaitTimeSeconds = 20
 
-type Connection struct {
-	QueueUrl string
-	Queue    sqsiface.SQSAPI
-	Session  *session.Session
+type Handler func(context.Context, *sqs.Message) ([]byte, error)
+type Callback func([]byte, error)
+
+type Worker struct {
+	QueueInUrl  string
+	QueueOutUrl string
+	Queue       sqsiface.SQSAPI
+	Session     *session.Session
+	Consumers   int
+	Logger      *zap.Logger
+	Handler     Handler
+	Callback    Callback
+	Name        string
+	Timeout     time.Duration
+	done        chan error
 }
 
-func (conn *Connection) deleteMessage(m *sqs.Message) {
+type WorkerConfig struct {
+	QueueIn  string
+	QueueOut string
+	Workers  int
+	Region   string
+	Handler  Handler
+	Callback Callback
+	Name     string
+	Timeout  int
+}
+
+type consumerDone struct {
+	Result []byte
+	Err    error
+}
+
+type HandlerTimeout struct{}
+
+func (HandlerTimeout) Error() string {
+	return "Handler Timeout!"
+}
+
+func (w *Worker) LogError(err error) {
+	w.Logger.Error(err.Error(),
+		zap.String("app", w.Name),
+		zap.Error(err),
+	)
+}
+
+func (w *Worker) LogInfo(msg string) {
+	w.Logger.Info(msg,
+		zap.String("app", w.Name),
+	)
+}
+
+func (w *Worker) deleteMessage(m *sqs.Message) error {
 	deleteInput := sqs.DeleteMessageInput{
 		ReceiptHandle: m.ReceiptHandle,
-		QueueUrl:      &conn.QueueUrl}
-	_, err := conn.Queue.DeleteMessage(&deleteInput)
+		QueueUrl:      &w.QueueInUrl}
+	_, err := w.Queue.DeleteMessage(&deleteInput)
 	if err != nil {
-		log.Println(err)
+		return err
+	}
+	return nil
+}
+
+func (w *Worker) sendMessage(msg []byte) error {
+	if w.QueueOutUrl == "" {
+		return nil
+	}
+	_, err := w.Queue.SendMessage(&sqs.SendMessageInput{
+		MessageBody: aws.String(string(msg)),
+		QueueUrl:    &w.QueueOutUrl,
+	})
+	return err
+}
+
+func (w *Worker) Exec(ctx context.Context, m *sqs.Message) ([]byte, error) {
+	complete := make(chan *consumerDone)
+
+	go func() {
+		result, err := w.Handler(ctx, m)
+		complete <- &consumerDone{result, err}
+	}()
+	select {
+	case result := <-complete:
+		return result.Result, result.Err
+	case <-time.After(w.Timeout):
+		return nil, &HandlerTimeout{}
 	}
 }
 
-func (conn *Connection) consume(cb Callback, in chan *sqs.Message) {
+func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	for {
+
 		select {
+		case <-ctx.Done():
+			return
 		case msg, running := <-in:
 			if !running {
 				return
 			}
-			err := cb(msg)
+
+			result, err := w.Exec(ctx, msg)
+			if w.Callback != nil {
+				w.Callback(result, err)
+			}
 			if err != nil {
-				log.Println(err)
-			} else {
-				conn.deleteMessage(msg)
+				w.LogError(err)
+				continue
+			}
+
+			err = w.sendMessage(result)
+			if err != nil {
+				w.LogError(err)
+				continue
+			}
+
+			err = w.deleteMessage(msg)
+			if err != nil {
+				w.LogError(err)
+				continue
 			}
 		}
 	}
 }
 
-func (conn *Connection) produce(ctx context.Context, params *sqs.ReceiveMessageInput, out chan *sqs.Message) {
+func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
+	params := &sqs.ReceiveMessageInput{
+		QueueUrl:            aws.String(w.QueueInUrl),
+		MaxNumberOfMessages: aws.Int64(MaxNumberOfMessages),
+		VisibilityTimeout:   aws.Int64(VisibilityTimeout),
+		WaitTimeSeconds:     aws.Int64(WaitTimeSeconds),
+	}
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("shutting down consumer...")
 			close(out)
 			return
 		default:
-			req, resp := conn.Queue.ReceiveMessageRequest(params)
+			req, resp := w.Queue.ReceiveMessageRequest(params)
 			err := req.Send()
 			if err != nil {
-				log.Println(err)
+				w.LogError(err)
 			} else {
 				messages := resp.Messages
 				if len(messages) > 0 {
@@ -69,37 +171,58 @@ func (conn *Connection) produce(ctx context.Context, params *sqs.ReceiveMessageI
 	}
 }
 
-func (conn *Connection) Run(ctx context.Context, cb Callback) {
+func (w *Worker) Close() {
+	w.done <- nil
+}
+
+func (w *Worker) Run() {
+	ctx, cancel := context.WithCancel(context.Background())
 	messages := make(chan *sqs.Message, 10)
 
-	params := &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(conn.QueueUrl),
-		MaxNumberOfMessages: aws.Int64(1),
-		VisibilityTimeout:   aws.Int64(10),
-		WaitTimeSeconds:     aws.Int64(20),
-	}
-
+	w.LogInfo(fmt.Sprint("Staring producer"))
 	go func() {
-		conn.produce(ctx, params, messages)
+		w.producer(ctx, messages)
 	}()
 
+	go func() {
+		<-w.done
+		cancel()
+	}()
+
+	w.LogInfo(fmt.Sprint("Staring consumer with ", w.Consumers, " consumers"))
 	// Consume messages
 	var wg sync.WaitGroup
-	for x := 0; x < 4; x++ {
+	for x := 0; x < w.Consumers; x++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			conn.consume(cb, messages)
+			w.consumer(ctx, messages)
 		}()
 	}
 	wg.Wait()
+	close(w.done)
 }
 
-func NewConnection(queueUrl string) *Connection {
-	session := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	return &Connection{
-		queueUrl,
+func NewWorker(wc WorkerConfig) *Worker {
+	session := session.New(&aws.Config{Region: aws.String(wc.Region)})
+	logger, _ := zap.NewProduction()
+	var timeout = wc.Timeout
+
+	if wc.Timeout == 0 {
+		timeout = DefaultTimeout
+	}
+
+	return &Worker{
+		wc.QueueIn,
+		wc.QueueOut,
 		sqs.New(session),
 		session,
+		wc.Workers,
+		logger,
+		wc.Handler,
+		wc.Callback,
+		wc.Name,
+		time.Duration(timeout) * time.Second,
+		make(chan error),
 	}
 }

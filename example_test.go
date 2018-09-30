@@ -8,12 +8,13 @@ import (
 )
 
 func Example() {
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	conn := worker.NewConnection("https://sqs.us-east-1.amazonaws.com/88888888888/bucket")
 
 	conn.Run(ctx,
 		func(m *sqs.Message) error {
 			log.Println(m)
+			cancel()
 			return nil
 		})
 }

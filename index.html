@@ -1,0 +1,280 @@
+use 'godoc cmd/github.com/ajbeach2/worker' for documentation on the github.com/ajbeach2/worker command 
+
+<!--
+	Copyright 2009 The Go Authors. All rights reserved.
+	Use of this source code is governed by a BSD-style
+	license that can be found in the LICENSE file.
+-->
+<!--
+	Note: Static (i.e., not template-generated) href and id
+	attributes start with "pkg-" to make it impossible for
+	them to conflict with generated attributes (some of which
+	correspond to Go identifiers).
+-->
+
+	<script type='text/javascript'>
+	document.ANALYSIS_DATA = ;
+	document.CALLGRAPH = ;
+	</script>
+
+	
+		
+		<div id="short-nav">
+			<dl>
+			<dd><code>import "github.com/ajbeach2/worker"</code></dd>
+			</dl>
+			<dl>
+			<dd><a href="#pkg-overview" class="overviewLink">Overview</a></dd>
+			<dd><a href="#pkg-index" class="indexLink">Index</a></dd>
+			
+				<dd><a href="#pkg-examples" class="examplesLink">Examples</a></dd>
+			
+			
+				<dd><a href="#pkg-subdirectories">Subdirectories</a></dd>
+			
+			</dl>
+		</div>
+		<!-- The package's Name is printed as title by the top-level template -->
+		<div id="pkg-overview" class="toggleVisible">
+			<div class="collapsed">
+				<h2 class="toggleButton" title="Click to show Overview section">Overview ▹</h2>
+			</div>
+			<div class="expanded">
+				<h2 class="toggleButton" title="Click to hide Overview section">Overview ▾</h2>
+				
+			</div>
+		</div>
+		<div id="example_" class="toggle">
+	<div class="collapsed">
+		<p class="exampleHeading toggleButton">▹ <span class="text">Example</span></p>
+	</div>
+	<div class="expanded">
+		<p class="exampleHeading toggleButton">▾ <span class="text">Example</span></p>
+		
+		
+		
+			<p>Code:</p>
+			<pre class="code">
+ctx, _ := context.WithCancel(context.Background())
+conn := worker.NewConnection(&#34;https://sqs.us-east-1.amazonaws.com/88888888888/bucket&#34;)
+
+conn.Run(ctx,
+    func(m *sqs.Message) error {
+        log.Println(m)
+        return nil
+    })
+</pre>
+			
+		
+	</div>
+</div>
+
+
+		<div id="pkg-index" class="toggleVisible">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Index section">Index ▹</h2>
+		</div>
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Index section">Index ▾</h2>
+
+		<!-- Table of contents for API; must be named manual-nav to turn off auto nav. -->
+			<div id="manual-nav">
+			<dl>
+			
+			
+			
+			
+				
+				<dd><a href="#Callback">type Callback</a></dd>
+				
+				
+			
+				
+				<dd><a href="#Connection">type Connection</a></dd>
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#NewConnection">func NewConnection(queueUrl string) *Connection</a></dd>
+				
+				
+					
+					<dd>&nbsp; &nbsp; <a href="#Connection.Run">func (conn *Connection) Run(ctx context.Context, cb Callback)</a></dd>
+				
+			
+			
+			</dl>
+			</div><!-- #manual-nav -->
+
+		
+		<div id="pkg-examples">
+			<h4>Examples</h4>
+			<dl>
+			
+			<dd><a class="exampleLink" href="#example_">Package</a></dd>
+			
+			</dl>
+		</div>
+		
+
+		
+			<h4>Package files</h4>
+			<p>
+			<span style="font-size:90%">
+			
+				<a href="/src/github.com/ajbeach2/worker/worker.go">worker.go</a>
+			
+			</span>
+			</p>
+		
+		</div><!-- .expanded -->
+		</div><!-- #pkg-index -->
+
+		<div id="pkg-callgraph" class="toggle" style="display: none">
+		<div class="collapsed">
+			<h2 class="toggleButton" title="Click to show Internal Call Graph section">Internal call graph ▹</h2>
+		</div> <!-- .expanded -->
+		<div class="expanded">
+			<h2 class="toggleButton" title="Click to hide Internal Call Graph section">Internal call graph ▾</h2>
+			<p>
+			  In the call graph viewer below, each node
+			  is a function belonging to this package
+			  and its children are the functions it
+			  calls&mdash;perhaps dynamically.
+			</p>
+			<p>
+			  The root nodes are the entry points of the
+			  package: functions that may be called from
+			  outside the package.
+			  There may be non-exported or anonymous
+			  functions among them if they are called
+			  dynamically from another package.
+			</p>
+			<p>
+			  Click a node to visit that function's source code.
+			  From there you can visit its callers by
+			  clicking its declaring <code>func</code>
+			  token.
+			</p>
+			<p>
+			  Functions may be omitted if they were
+			  determined to be unreachable in the
+			  particular programs or tests that were
+			  analyzed.
+			</p>
+			<!-- Zero means show all package entry points. -->
+			<ul style="margin-left: 0.5in" id="callgraph-0" class="treeview"></ul>
+		</div>
+		</div> <!-- #pkg-callgraph -->
+
+		
+		
+		
+		
+			
+			
+			<h2 id="Callback">type <a href="/src/target/worker.go?s=219:259#L3">Callback</a>
+				<a class="permalink" href="#Callback">&#xb6;</a>
+			</h2>
+			
+			<pre>type Callback func(m *<a href="/pkg/github.com/aws/aws-sdk-go/service/sqs/">sqs</a>.<a href="/pkg/github.com/aws/aws-sdk-go/service/sqs/#Message">Message</a>) <a href="/pkg/builtin/#error">error</a></pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+
+			
+		
+			
+			
+			<h2 id="Connection">type <a href="/src/target/worker.go?s=261:357#L5">Connection</a>
+				<a class="permalink" href="#Connection">&#xb6;</a>
+			</h2>
+			
+			<pre>type Connection struct {
+<span id="Connection.QueueUrl"></span>    QueueUrl <a href="/pkg/builtin/#string">string</a>
+<span id="Connection.Queue"></span>    Queue    <a href="/pkg/github.com/aws/aws-sdk-go/service/sqs/sqsiface/">sqsiface</a>.<a href="/pkg/github.com/aws/aws-sdk-go/service/sqs/sqsiface/#SQSAPI">SQSAPI</a>
+<span id="Connection.Session"></span>    Session  *<a href="/pkg/github.com/aws/aws-sdk-go/aws/session/">session</a>.<a href="/pkg/github.com/aws/aws-sdk-go/aws/session/#Session">Session</a>
+}</pre>
+
+			
+
+			
+
+			
+			
+			
+
+			
+				
+				<h3 id="NewConnection">func <a href="/src/target/worker.go?s=1916:1963#L88">NewConnection</a>
+					<a class="permalink" href="#NewConnection">&#xb6;</a>
+				</h3>
+				<pre>func NewConnection(queueUrl <a href="/pkg/builtin/#string">string</a>) *<a href="#Connection">Connection</a></pre>
+				
+				
+				
+			
+
+			
+				
+				<h3 id="Connection.Run">func (*Connection) <a href="/src/target/worker.go?s=1381:1442#L62">Run</a>
+					<a class="permalink" href="#Connection.Run">&#xb6;</a>
+				</h3>
+				<pre>func (conn *<a href="#Connection">Connection</a>) Run(ctx <a href="/pkg/context/">context</a>.<a href="/pkg/context/#Context">Context</a>, cb <a href="#Callback">Callback</a>)</pre>
+				
+				
+				
+				
+			
+		
+	
+
+	
+
+
+
+
+
+	
+	
+		<h2 id="pkg-subdirectories">Subdirectories</h2>
+	
+	
+
+
+	<div class="pkg-dir">
+		<table>
+			<tr>
+				<th class="pkg-name">Name</th>
+				<th class="pkg-synopsis">Synopsis</th>
+			</tr>
+
+			
+			<tr>
+				<td colspan="2"><a href="..">..</a></td>
+			</tr>
+			
+
+			
+				
+					<tr>
+						<td class="pkg-name" style="padding-left: 0px;">
+							<a href="cmd/">cmd</a>
+						</td>
+						<td class="pkg-synopsis">
+							
+						</td>
+					</tr>
+				
+			
+		</table>
+	</div>
+
+
+	
+

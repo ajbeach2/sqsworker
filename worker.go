@@ -13,9 +13,10 @@ import (
 type Callback func(m *sqs.Message) error
 
 type Connection struct {
-	QueueUrl string
-	Queue    sqsiface.SQSAPI
-	Session  *session.Session
+	QueueUrl  string
+	Queue     sqsiface.SQSAPI
+	Session   *session.Session
+	Consumers int
 }
 
 func (conn *Connection) deleteMessage(m *sqs.Message) {
@@ -85,7 +86,7 @@ func (conn *Connection) Run(ctx context.Context, cb Callback) {
 
 	// Consume messages
 	var wg sync.WaitGroup
-	for x := 0; x < 4; x++ {
+	for x := 0; x < conn.Consumers; x++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -95,11 +96,12 @@ func (conn *Connection) Run(ctx context.Context, cb Callback) {
 	wg.Wait()
 }
 
-func NewConnection(queueUrl string) *Connection {
+func NewConnection(queueUrl string, consumers int) *Connection {
 	session := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	return &Connection{
 		queueUrl,
 		sqs.New(session),
 		session,
+		consumers,
 	}
 }

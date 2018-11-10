@@ -35,7 +35,7 @@ func (m *MockQueue) ReceiveMessageRequest(input *sqs.ReceiveMessageInput) (*requ
 
 func TestProcessMessage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	conn := worker.NewConnection("https://sqs.us-east-1.amazonaws.com/88888888888/bucket")
+	conn := worker.NewConnection("https://sqs.us-east-1.amazonaws.com/88888888888/bucket", 1)
 
 	msgStr := "hello world"
 	out := &sqs.Message{Body: &msgStr}

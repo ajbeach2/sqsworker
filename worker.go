@@ -127,7 +127,13 @@ func (conn *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	}
 }
 
-func (conn *Worker) producer(ctx context.Context, params *sqs.ReceiveMessageInput, out chan *sqs.Message) {
+func (conn *Worker) producer(ctx context.Context, out chan *sqs.Message) {
+	params := &sqs.ReceiveMessageInput{
+		QueueUrl:            aws.String(conn.QueueInUrl),
+		MaxNumberOfMessages: aws.Int64(10),
+		VisibilityTimeout:   aws.Int64(10),
+		WaitTimeSeconds:     aws.Int64(20),
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -157,16 +163,9 @@ func (conn *Worker) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	messages := make(chan *sqs.Message, 10)
 
-	params := &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(conn.QueueInUrl),
-		MaxNumberOfMessages: aws.Int64(10),
-		VisibilityTimeout:   aws.Int64(10),
-		WaitTimeSeconds:     aws.Int64(20),
-	}
-
 	conn.LogInfo(fmt.Sprint("Staring producer"))
 	go func() {
-		conn.producer(ctx, params, messages)
+		conn.producer(ctx, messages)
 		close(conn.done)
 	}()
 

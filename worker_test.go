@@ -12,9 +12,8 @@ import (
 
 type MockQueue struct {
 	sqsiface.SQSAPI
-	Result []*sqs.Message
-	In     chan string
-	Out    chan string
+	In  chan string
+	Out chan string
 }
 
 func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {

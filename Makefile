@@ -6,4 +6,4 @@ vet:
 	go vet github.com/ajbeach2/worker
 
 bench:
-	go test -bench=. -memprofile mem.out
+	go test -bench=.

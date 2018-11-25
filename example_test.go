@@ -12,7 +12,7 @@ func Example() {
 		return []byte(strings.ToLower(*m.Body)), nil
 	}
 
-	conn := worker.NewWorker(worker.WorkerConfig{
+	w := worker.NewWorker(worker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
@@ -21,5 +21,5 @@ func Example() {
 		Name:     "TestApp",
 	})
 
-	conn.Run()
+	w.Run()
 }

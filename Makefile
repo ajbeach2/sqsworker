@@ -7,3 +7,4 @@ vet:
 
 bench:
 	go test -bench=.
+

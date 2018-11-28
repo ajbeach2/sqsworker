@@ -14,25 +14,27 @@ import (
 
 type MockQueue struct {
 	sqsiface.SQSAPI
-	In  chan string
-	Out chan string
+	In      chan string
+	Out     chan string
+	req     *request.Request
+	recieve *sqs.ReceiveMessageOutput
 }
 
+var Msg string
+
 func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
-	return &sqs.DeleteMessageOutput{}, nil
+	return nil, nil
 }
 
 func (m *MockQueue) ReceiveMessageRequest(input *sqs.ReceiveMessageInput) (*request.Request, *sqs.ReceiveMessageOutput) {
-	msg := <-m.In
-	out := &sqs.Message{Body: &msg}
-	return &request.Request{}, &sqs.ReceiveMessageOutput{
-		Messages: []*sqs.Message{out},
-	}
+	Msg = <-m.In
+	m.recieve.Messages[0].Body = &Msg
+	return m.req, m.recieve
 }
 
 func (m *MockQueue) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
 	m.Out <- *input.MessageBody
-	return &sqs.SendMessageOutput{}, nil
+	return nil, nil
 }
 
 func (m *MockQueue) Push(msg string) {
@@ -52,6 +54,10 @@ func GetMockeQueue() *MockQueue {
 	return &MockQueue{
 		In:  make(chan string),
 		Out: make(chan string),
+		req: &request.Request{},
+		recieve: &sqs.ReceiveMessageOutput{
+			Messages: []*sqs.Message{&sqs.Message{Body: nil}},
+		},
 	}
 }
 
@@ -60,7 +66,7 @@ func BenchmarkHello(b *testing.B) {
 	queue := GetMockeQueue()
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		return []byte(*m.Body), nil
+		return []byte{}, nil
 	}
 
 	w := worker.NewWorker(worker.WorkerConfig{
@@ -74,7 +80,7 @@ func BenchmarkHello(b *testing.B) {
 	w.Queue = queue
 	go func() {
 		for i := 0; i < b.N; i++ {
-			queue.Push("test")
+			queue.Push("")
 			queue.Pop()
 		}
 		w.Close()

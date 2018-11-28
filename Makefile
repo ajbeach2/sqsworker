@@ -6,5 +6,5 @@ vet:
 	go vet github.com/ajbeach2/worker
 
 bench:
-	go test -bench=.
+	go test -v -coverprofile=cover.out -cpuprofile cpu.prof -memprofile mem.prof -bench .
 

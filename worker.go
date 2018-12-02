@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -44,6 +45,7 @@ type WorkerConfig struct {
 	Callback Callback
 	Name     string
 	Timeout  int
+	Logger   *zap.Logger
 }
 
 type consumerDone struct {
@@ -57,68 +59,86 @@ func (HandlerTimeout) Error() string {
 	return "Handler Timeout!"
 }
 
+type handlerParams struct {
+	Done   chan *consumerDone
+	Result *consumerDone
+	Timer  *time.Timer
+}
+
+func (w *Worker) getHandlerParams() *handlerParams {
+	return &handlerParams{
+		make(chan *consumerDone),
+		&consumerDone{},
+		time.NewTimer(w.Timeout),
+	}
+}
+
 func (w *Worker) LogError(err error) {
-	w.Logger.Error(err.Error(),
-		zap.String("app", w.Name),
-		zap.Error(err),
-	)
+	if w.Logger != nil {
+		w.Logger.Error(err.Error(),
+			zap.String("app", w.Name),
+			zap.Error(err),
+		)
+	}
 }
 
 func (w *Worker) LogInfo(msg string) {
-	w.Logger.Info(msg,
-		zap.String("app", w.Name),
-	)
+	if w.Logger != nil {
+		w.Logger.Info(msg,
+			zap.String("app", w.Name),
+		)
+	}
 }
 
-func (w *Worker) deleteMessage(m *sqs.Message) error {
-	deleteInput := sqs.DeleteMessageInput{
-		ReceiptHandle: m.ReceiptHandle,
-		QueueUrl:      &w.QueueInUrl}
-	_, err := w.Queue.DeleteMessage(&deleteInput)
+func (w *Worker) deleteMessage(m *sqs.DeleteMessageInput) error {
+	_, err := w.Queue.DeleteMessage(m)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (w *Worker) sendMessage(msg []byte) error {
+func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 	if w.QueueOutUrl == "" {
 		return nil
 	}
-	_, err := w.Queue.SendMessage(&sqs.SendMessageInput{
-		MessageBody: aws.String(string(msg)),
-		QueueUrl:    &w.QueueOutUrl,
-	})
+	_, err := w.Queue.SendMessage(msg)
 	return err
 }
 
-func (w *Worker) Exec(ctx context.Context, m *sqs.Message) ([]byte, error) {
-	complete := make(chan *consumerDone)
+func (w *Worker) Exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
+	if !hp.Timer.Stop() {
+		<-hp.Timer.C
+	}
+	hp.Timer.Reset(w.Timeout)
 
 	go func() {
 		result, err := w.Handler(ctx, m)
-		complete <- &consumerDone{result, err}
+		hp.Result.Result = result
+		hp.Result.Err = err
+		hp.Done <- hp.Result
 	}()
+
 	select {
-	case result := <-complete:
+	case result := <-hp.Done:
 		return result.Result, result.Err
-	case <-time.After(w.Timeout):
+	case <-hp.Timer.C:
 		return nil, &HandlerTimeout{}
 	}
 }
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
-	for {
+	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutUrl}
+	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInUrl}
+	hanlderInput := w.getHandlerParams()
+	var msgString string
 
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg, running := <-in:
-			if !running {
-				return
-			}
-
-			result, err := w.Exec(ctx, msg)
+		case msg := <-in:
+			result, err := w.Exec(ctx, hanlderInput, msg)
 			if w.Callback != nil {
 				w.Callback(result, err)
 			}
@@ -126,14 +146,16 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 				w.LogError(err)
 				continue
 			}
-
-			err = w.sendMessage(result)
+			msgString = string(result)
+			sendInput.MessageBody = &msgString
+			err = w.sendMessage(sendInput)
 			if err != nil {
 				w.LogError(err)
 				continue
 			}
 
-			err = w.deleteMessage(msg)
+			deleteInput.ReceiptHandle = msg.ReceiptHandle
+			err = w.deleteMessage(deleteInput)
 			if err != nil {
 				w.LogError(err)
 				continue
@@ -149,10 +171,10 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 		VisibilityTimeout:   aws.Int64(VisibilityTimeout),
 		WaitTimeSeconds:     aws.Int64(WaitTimeSeconds),
 	}
+
 	for {
 		select {
 		case <-ctx.Done():
-			close(out)
 			return
 		default:
 			req, resp := w.Queue.ReceiveMessageRequest(params)
@@ -172,7 +194,7 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 }
 
 func (w *Worker) Close() {
-	w.done <- nil
+	close(w.done)
 }
 
 func (w *Worker) Run() {
@@ -182,6 +204,7 @@ func (w *Worker) Run() {
 	w.LogInfo(fmt.Sprint("Staring producer"))
 	go func() {
 		w.producer(ctx, messages)
+		close(messages)
 	}()
 
 	go func() {
@@ -200,16 +223,26 @@ func (w *Worker) Run() {
 		}()
 	}
 	wg.Wait()
-	close(w.done)
 }
 
 func NewWorker(wc WorkerConfig) *Worker {
 	session := session.New(&aws.Config{Region: aws.String(wc.Region)})
-	logger, _ := zap.NewProduction()
+	var logger *zap.Logger
 	var timeout = wc.Timeout
+	workers := runtime.NumCPU()
 
 	if wc.Timeout == 0 {
 		timeout = DefaultTimeout
+	}
+
+	if wc.Workers != 0 {
+		workers = wc.Workers
+	}
+
+	if wc.Logger == nil {
+		logger, _ = zap.NewProduction()
+	} else {
+		logger = wc.Logger
 	}
 
 	return &Worker{
@@ -217,7 +250,7 @@ func NewWorker(wc WorkerConfig) *Worker {
 		wc.QueueOut,
 		sqs.New(session),
 		session,
-		wc.Workers,
+		workers,
 		logger,
 		wc.Handler,
 		wc.Callback,

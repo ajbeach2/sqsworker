@@ -16,7 +16,7 @@ import (
 const DefaultTimeout = 30
 const DefaultWorkers = 1
 const MaxNumberOfMessages = 10
-const VisibilityTimeout = 10
+const VisibilityTimeout = 60
 const WaitTimeSeconds = 20
 
 type Handler func(context.Context, *sqs.Message) ([]byte, error)

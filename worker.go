@@ -181,7 +181,7 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 			req, resp := w.Queue.ReceiveMessageRequest(params)
 			err := req.Send()
 			if err != nil {
-				w.LogError("recieve error failed!", err)
+				w.LogError("recieve messages failed!", err)
 			} else {
 				messages := resp.Messages
 				if len(messages) > 0 {

@@ -73,10 +73,11 @@ func (w *Worker) getHandlerParams() *handlerParams {
 	}
 }
 
-func (w *Worker) LogError(err error) {
+func (w *Worker) LogError(msg string, err error) {
 	if w.Logger != nil {
 		w.Logger.Error(err.Error(),
 			zap.String("app", w.Name),
+			zap.String("msg", msg),
 			zap.Error(err),
 		)
 	}
@@ -143,21 +144,21 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 				w.Callback(result, err)
 			}
 			if err != nil {
-				w.LogError(err)
+				w.LogError("handler failed!", err)
 				continue
 			}
 			msgString = string(result)
 			sendInput.MessageBody = &msgString
 			err = w.sendMessage(sendInput)
 			if err != nil {
-				w.LogError(err)
+				w.LogError("send message failed!", err)
 				continue
 			}
 
 			deleteInput.ReceiptHandle = msg.ReceiptHandle
 			err = w.deleteMessage(deleteInput)
 			if err != nil {
-				w.LogError(err)
+				w.LogError("delete message failed!", err)
 				continue
 			}
 		}
@@ -180,7 +181,7 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 			req, resp := w.Queue.ReceiveMessageRequest(params)
 			err := req.Send()
 			if err != nil {
-				w.LogError(err)
+				w.LogError("recieve error failed!", err)
 			} else {
 				messages := resp.Messages
 				if len(messages) > 0 {

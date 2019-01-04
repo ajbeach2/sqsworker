@@ -200,7 +200,7 @@ func (w *Worker) Close() {
 
 func (w *Worker) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
-	messages := make(chan *sqs.Message, 10)
+	messages := make(chan *sqs.Message)
 
 	w.LogInfo(fmt.Sprint("Staring producer"))
 	go func() {

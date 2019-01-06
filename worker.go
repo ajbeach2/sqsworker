@@ -15,7 +15,7 @@ import (
 
 const DefaultTimeout = 30
 const DefaultWorkers = 1
-const MaxNumberOfMessages = 1
+const MaxNumberOfMessages = 10
 const VisibilityTimeout = 60
 const WaitTimeSeconds = 20
 

@@ -73,7 +73,7 @@ func (w *Worker) getHandlerParams() *handlerParams {
 	}
 }
 
-func (w *Worker) LogError(msg string, err error) {
+func (w *Worker) logError(msg string, err error) {
 	if w.Logger != nil {
 		w.Logger.Error(err.Error(),
 			zap.String("app", w.Name),
@@ -83,7 +83,7 @@ func (w *Worker) LogError(msg string, err error) {
 	}
 }
 
-func (w *Worker) LogInfo(msg string) {
+func (w *Worker) logInfo(msg string) {
 	if w.Logger != nil {
 		w.Logger.Info(msg,
 			zap.String("app", w.Name),
@@ -107,7 +107,7 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 	return err
 }
 
-func (w *Worker) Exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
+func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
 	if !hp.Timer.Stop() {
 		<-hp.Timer.C
 	}
@@ -139,26 +139,26 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-			result, err := w.Exec(ctx, hanlderInput, msg)
+			result, err := w.exec(ctx, hanlderInput, msg)
 			if w.Callback != nil {
 				w.Callback(result, err)
 			}
 			if err != nil {
-				w.LogError("handler failed!", err)
+				w.logError("handler failed!", err)
 				continue
 			}
 			msgString = string(result)
 			sendInput.MessageBody = &msgString
 			err = w.sendMessage(sendInput)
 			if err != nil {
-				w.LogError("send message failed!", err)
+				w.logError("send message failed!", err)
 				continue
 			}
 
 			deleteInput.ReceiptHandle = msg.ReceiptHandle
 			err = w.deleteMessage(deleteInput)
 			if err != nil {
-				w.LogError("delete message failed!", err)
+				w.logError("delete message failed!", err)
 				continue
 			}
 		}
@@ -181,7 +181,7 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 			req, resp := w.Queue.ReceiveMessageRequest(params)
 			err := req.Send()
 			if err != nil {
-				w.LogError("recieve messages failed!", err)
+				w.logError("recieve messages failed!", err)
 			} else {
 				messages := resp.Messages
 				if len(messages) > 0 {
@@ -202,7 +202,7 @@ func (w *Worker) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	messages := make(chan *sqs.Message, w.Consumers)
 
-	w.LogInfo(fmt.Sprint("Staring producer"))
+	w.logInfo(fmt.Sprint("Staring producer"))
 	go func() {
 		w.producer(ctx, messages)
 		close(messages)
@@ -213,7 +213,7 @@ func (w *Worker) Run() {
 		cancel()
 	}()
 
-	w.LogInfo(fmt.Sprint("Staring consumer with ", w.Consumers, " consumers"))
+	w.logInfo(fmt.Sprint("Staring consumer with ", w.Consumers, " consumers"))
 	// Consume messages
 	var wg sync.WaitGroup
 	for x := 0; x < w.Consumers; x++ {

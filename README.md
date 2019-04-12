@@ -19,6 +19,7 @@ var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) 
 
 w := worker.NewWorker(worker.WorkerConfig{
     QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+    // QueueOut is optional
     QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
     Workers:  1,
     Region:   "us-east-1",

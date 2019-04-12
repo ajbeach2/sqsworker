@@ -3,7 +3,7 @@ sqs consumer written in go
 
 
 ## Example
-```
+```go
 var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
     return []byte(strings.ToLower(*m.Body)), nil
 }

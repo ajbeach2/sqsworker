@@ -4,6 +4,15 @@ sqs consumer written in go
 
 ## Example
 ```go
+package main
+
+import (
+	"context"
+	"github.com/ajbeach2/worker"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"strings"
+)
+
 var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
     return []byte(strings.ToLower(*m.Body)), nil
 }

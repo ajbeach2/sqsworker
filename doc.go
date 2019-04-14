@@ -25,11 +25,11 @@
 // is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in seconds
 // can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
 //
-//  w := worker.NewWorker(sess, worker.WorkerConfig{
-// 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+//	w := worker.NewWorker(sess, worker.WorkerConfig{
+//		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 //		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 //		Workers:  4,
-//      Timeout,  30, // Handler Timeout in seconds.
+//		Timeout,  30, // Handler Timeout in seconds.
 //		Handler:  handlerFunction,
 //		Name:     "TestApp",
 //	})

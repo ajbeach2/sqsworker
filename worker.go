@@ -13,11 +13,20 @@ import (
 	"time"
 )
 
+// Timeout for each handler function in seconds
 const DefaultTimeout = 30
+
+// Number of worker goroutines to spawn, each runs the handler function
 const DefaultWorkers = 1
-const MaxNumberOfMessages = 10
-const VisibilityTimeout = 60
-const WaitTimeSeconds = 20
+
+// Default amount of messages recieved by each SQS request
+const DefaultMaxNumberOfMessages = 10
+
+// SQS visibility Timeout
+const DefaultVisibilityTimeout = 60
+
+// Long-polling interval for SQS
+const DefaultWaitTimeSeconds = 20
 
 type Handler func(context.Context, *sqs.Message) ([]byte, error)
 type Callback func([]byte, error)
@@ -39,6 +48,7 @@ type Worker struct {
 type WorkerConfig struct {
 	QueueIn  string
 	QueueOut string
+	// If the number of workers is 0, the number of workers defaults to runtime.NumCPU()
 	Workers  int
 	Region   string
 	Handler  Handler
@@ -53,9 +63,9 @@ type consumerDone struct {
 	Err    error
 }
 
-type HandlerTimeout struct{}
+type HandlerTimeoutError struct{}
 
-func (HandlerTimeout) Error() string {
+func (HandlerTimeoutError) Error() string {
 	return "Handler Timeout!"
 }
 
@@ -124,7 +134,7 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 	case result := <-hp.Done:
 		return result.Result, result.Err
 	case <-hp.Timer.C:
-		return nil, &HandlerTimeout{}
+		return nil, &HandlerTimeoutError{}
 	}
 }
 
@@ -168,9 +178,9 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 	params := &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(w.QueueInUrl),
-		MaxNumberOfMessages: aws.Int64(MaxNumberOfMessages),
-		VisibilityTimeout:   aws.Int64(VisibilityTimeout),
-		WaitTimeSeconds:     aws.Int64(WaitTimeSeconds),
+		MaxNumberOfMessages: aws.Int64(DefaultMaxNumberOfMessages),
+		VisibilityTimeout:   aws.Int64(DefaultVisibilityTimeout),
+		WaitTimeSeconds:     aws.Int64(DefaultWaitTimeSeconds),
 	}
 
 	for {
@@ -226,8 +236,7 @@ func (w *Worker) Run() {
 	wg.Wait()
 }
 
-func NewWorker(wc WorkerConfig) *Worker {
-	session := session.New(&aws.Config{Region: aws.String(wc.Region)})
+func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	var logger *zap.Logger
 	var timeout = wc.Timeout
 	workers := runtime.NumCPU()
@@ -249,8 +258,8 @@ func NewWorker(wc WorkerConfig) *Worker {
 	return &Worker{
 		wc.QueueIn,
 		wc.QueueOut,
-		sqs.New(session),
-		session,
+		sqs.New(sess),
+		sess,
 		workers,
 		logger,
 		wc.Handler,

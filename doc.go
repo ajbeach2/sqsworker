@@ -1,15 +1,14 @@
 // Copyright 2019 Alexander Beach
 // license that can be found in the LICENSE file.
 
-// Package worker implements a SQS Consumer
+// Package sqsworker implements a SQS consumer that can process sqs messages from a
+// SQS queue and optionally send the results to a result queue.
 //
 // Overview
 //
-// The Worker type represents a SQS consumer that can process sqs messages from a
-// SQS queue and optionally send the results to a result queue. The inenteded use
-// multiple consumers reading from the same queue. Consumers are represeted by
-// concurrently handler functions that are managed by the Worker type. This package
-// only does long-polling based sqs recieves.
+// The inenteded use of this package is for multiple consumers reading
+// from the same queue. Consumers are represeted by concurrent handler functions
+// hat are managed by the Worker type. This package only does long-polling based sqs recieves.
 //
 // To use his package, first define a handler function. This can also be a closure:
 //
@@ -23,12 +22,14 @@
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
 // define an outbound queue, and number of concurrent workers. If the number of workers
-// is set to 0, the number of workers defaults to runtime.NumCPU()
+// is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in seconds
+// can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
 //
-//	w := worker.NewWorker(sess, worker.WorkerConfig{
+//  w := worker.NewWorker(sess, worker.WorkerConfig{
 // 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 //		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 //		Workers:  4,
+//      Timeout,  30, // Handler Timeout in seconds.
 //		Handler:  handlerFunction,
 //		Name:     "TestApp",
 //	})
@@ -38,7 +39,8 @@
 //
 // Concurrency
 //
-// Handler function will be called concurrently by multiple workers depending on the configuration,
-// and it is best to ensure that handler functions can safely be executed concurrently.
+// Handler function will be called concurrently by multiple workers depending on the configuration.
+// It is best to ensure that handler functions can be executed concurrently,
+// especially if they are closures and share state.
 //
 package worker

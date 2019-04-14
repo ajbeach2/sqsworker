@@ -16,7 +16,7 @@ func ExampleWorker() {
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 
-	w := worker.NewWorker(sess, worker.WorkerConfig{
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,

@@ -73,7 +73,7 @@ func BenchmarkWorker(b *testing.B) {
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	w := worker.NewWorker(sess, worker.WorkerConfig{
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
@@ -104,13 +104,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	var callback = func(result []byte, err error) {
-		if _, ok := err.(*worker.HandlerTimeoutError); !ok {
+		if _, ok := err.(*sqsworker.HandlerTimeoutError); !ok {
 			t.Error("expected worker.HandlerTimeoutError error")
 		}
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	w := worker.NewWorker(sess, worker.WorkerConfig{
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
 		Region:   "us-east-1",
@@ -147,7 +147,7 @@ func TestError(t *testing.T) {
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	w := worker.NewWorker(sess, worker.WorkerConfig{
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
 		Region:   "us-east-1",
@@ -183,7 +183,7 @@ func TestProcessMessage(t *testing.T) {
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	w := worker.NewWorker(sess, worker.WorkerConfig{
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,

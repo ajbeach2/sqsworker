@@ -48,7 +48,7 @@ and it is best to ensure that handler functions can be executed concurrently, es
 
 ## Performance
 
-Real world performace will be dicted by latency to sqs. The benchmarks mock sqs calls to illustrate that
+Real world performace will be dictated by latency to sqs. The benchmarks mock sqs calls to illustrate that
 the package adds very little overhead to consuming messages, and to ensure that memory is managed to not
 create more garbage collection than needed.
 

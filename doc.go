@@ -44,4 +44,4 @@
 // It is best to ensure that handler functions can be executed concurrently,
 // especially if they are closures and share state.
 //
-package worker
+package sqsworker

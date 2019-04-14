@@ -31,6 +31,7 @@ is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in sec
 can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
 
 ```go
+sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 w := worker.NewWorker(sess, worker.WorkerConfig{
 	QueueIn:  "https:sqs.us-east-1.amazonaws.com/88888888888/In",
 	QueueOut: "https:sqs.us-east-1.amazonaws.com/88888888888/Out",

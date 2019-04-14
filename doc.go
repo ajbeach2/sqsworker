@@ -1,15 +1,14 @@
 // Copyright 2019 Alexander Beach
 // license that can be found in the LICENSE file.
 
-// Package worker implements a SQS Consumer
+// Package sqsworker implements a SQS consumer that can process sqs messages from a
+// SQS queue and optionally send the results to a result queue.
 //
 // Overview
 //
-// The Worker type represents a SQS consumer that can process sqs messages from a
-// SQS queue and optionally send the results to a result queue. The inenteded use
-// multiple consumers reading from the same queue. Consumers are represeted by
-// concurrently handler functions that are managed by the Worker type. This package
-// only does long-polling based sqs recieves.
+// The inenteded use of this package is for multiple consumers reading
+// from the same queue. Consumers are represeted by concurrent handler functions
+// hat are managed by the Worker type. This package only does long-polling based sqs recieves.
 //
 // To use his package, first define a handler function. This can also be a closure:
 //

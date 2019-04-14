@@ -50,7 +50,6 @@ type WorkerConfig struct {
 	QueueOut string
 	// If the number of workers is 0, the number of workers defaults to runtime.NumCPU()
 	Workers  int
-	Region   string
 	Handler  Handler
 	Callback Callback
 	Name     string

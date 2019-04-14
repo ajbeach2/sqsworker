@@ -78,7 +78,6 @@ func BenchmarkWorker(b *testing.B) {
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
 		Logger:   zap.NewNop(),
-		Region:   "us-east-1",
 		Handler:  handlerFunction,
 		Name:     "TestApp",
 	})
@@ -113,7 +112,6 @@ func TestTimeout(t *testing.T) {
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
-		Region:   "us-east-1",
 		Handler:  handlerFunction,
 		Logger:   zap.NewNop(),
 		Callback: callback,
@@ -150,7 +148,6 @@ func TestError(t *testing.T) {
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
-		Region:   "us-east-1",
 		Handler:  handlerFunction,
 		Logger:   zap.NewNop(),
 		Callback: callback,
@@ -187,7 +184,6 @@ func TestProcessMessage(t *testing.T) {
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
-		Region:   "us-east-1",
 		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
 		Callback: callback,

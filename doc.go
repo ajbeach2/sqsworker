@@ -23,12 +23,14 @@
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
 // define an outbound queue, and number of concurrent workers. If the number of workers
-// is set to 0, the number of workers defaults to runtime.NumCPU()
+// is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in seconds
+// can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
 //
-//	w := worker.NewWorker(sess, worker.WorkerConfig{
+//  w := worker.NewWorker(sess, worker.WorkerConfig{
 // 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 //		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 //		Workers:  4,
+//      Timeout,  30, // Handler Timeout in seconds.
 //		Handler:  handlerFunction,
 //		Name:     "TestApp",
 //	})
@@ -38,7 +40,8 @@
 //
 // Concurrency
 //
-// Handler function will be called concurrently by multiple workers depending on the configuration,
-// and it is best to ensure that handler functions can safely be executed concurrently.
+// Handler function will be called concurrently by multiple workers depending on the configuration.
+// It is best to ensure that handler functions can be executed concurrently,
+// especially if they are closures and share state.
 //
 package worker

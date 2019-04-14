@@ -64,7 +64,7 @@ func GetMockeQueue() *MockQueue {
 	}
 }
 
-func BenchmarkHello(b *testing.B) {
+func BenchmarkWorker(b *testing.B) {
 	b.ReportAllocs()
 	queue := GetMockeQueue()
 

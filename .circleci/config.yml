@@ -6,7 +6,7 @@ jobs:
   build:
     docker:
       - image: circleci/golang:1.11
-    working_directory: /go/src/github.com/ajbeach2/worker
+    working_directory: /go/src/github.com/ajbeach2/sqsworker
     steps:
       - checkout
       - run: go get -v -t -d ./...

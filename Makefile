@@ -3,7 +3,7 @@ test:
 cover:
 	go tool cover -html=cover.out
 vet:
-	go vet github.com/ajbeach2/worker
+	go vet github.com/ajbeach2/sqsworker
 bench:
 	go test -bench .
 doc:

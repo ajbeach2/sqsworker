@@ -1,4 +1,4 @@
-module github.com/ajbeach2/worker
+module github.com/ajbeach2/sqsworker
 
 go 1.12
 

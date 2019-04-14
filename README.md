@@ -42,7 +42,7 @@ The worker will send messages to the QueueOut queue on succesfull runs.
 ## Concurrency
 
 Handler function will be called concurrently by multiple workers depending on the configuration,
-and it is best to ensure that handler functions can called concurrently.
+and it is best to ensure that handler functions can be executed concurrently if they are closures.
 
 ## Performance
 

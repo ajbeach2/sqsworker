@@ -9,7 +9,7 @@ Concurrent SQS Consumer written on Go
 The Worker type represents a SQS consumer that can process sqs messages from a
 SQS queue and optionally send the results to a queue. The inenteded use is
 multiple concurrent consumers reading from the same queue which execute the
-hander functions defined on the Worker struct.
+hander function defined on the Worker struct.
 
 To use his package, first define a handler function. This can also be a closure:
 
@@ -48,7 +48,7 @@ The worker will send messages to the QueueOut queue on succesfull runs.
 ## Concurrency
 
 Handler function will be called concurrently by multiple workers depending on the configuration,
-and it is best to ensure that handler functions can be executed concurrently, especially if they are closures and share state.
+and it is best to ensure that handler function can be executed concurrently, especially if it is a closure and there is shared state.
 
 ## Performance
 

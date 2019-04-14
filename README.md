@@ -1,4 +1,4 @@
-# sqsworker
+# sqsworker [![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
 sqs consumer written in go
 
 ## Overview

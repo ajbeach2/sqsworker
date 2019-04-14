@@ -1,4 +1,4 @@
-package worker_test
+package sqsworker_test
 
 import (
 	"context"

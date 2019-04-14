@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ajbeach2/worker"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	"go.uber.org/zap"
 	"testing"
 	"time"
 )
@@ -56,7 +59,7 @@ func GetMockeQueue() *MockQueue {
 		Out: make(chan string),
 		req: &request.Request{},
 		recieve: &sqs.ReceiveMessageOutput{
-			Messages: []*sqs.Message{&sqs.Message{Body: nil}},
+			Messages: []*sqs.Message{{Body: nil}},
 		},
 	}
 }
@@ -69,10 +72,12 @@ func BenchmarkHello(b *testing.B) {
 		return []byte{}, nil
 	}
 
-	w := worker.NewWorker(worker.WorkerConfig{
+	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+	w := worker.NewWorker(sess, worker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
+		Logger:   zap.NewNop(),
 		Region:   "us-east-1",
 		Handler:  handlerFunction,
 		Name:     "TestApp",
@@ -99,16 +104,18 @@ func TestTimeout(t *testing.T) {
 	}
 
 	var callback = func(result []byte, err error) {
-		if _, ok := err.(*worker.HandlerTimeout); !ok {
-			t.Error("expected worker.HandlerTimeout error")
+		if _, ok := err.(*worker.HandlerTimeoutError); !ok {
+			t.Error("expected worker.HandlerTimeoutError error")
 		}
 	}
 
-	w := worker.NewWorker(worker.WorkerConfig{
+	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+	w := worker.NewWorker(sess, worker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
 		Region:   "us-east-1",
 		Handler:  handlerFunction,
+		Logger:   zap.NewNop(),
 		Callback: callback,
 		Name:     "TestApp",
 		Timeout:  1,
@@ -139,11 +146,13 @@ func TestError(t *testing.T) {
 		}
 	}
 
-	w := worker.NewWorker(worker.WorkerConfig{
+	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+	w := worker.NewWorker(sess, worker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
 		Region:   "us-east-1",
 		Handler:  handlerFunction,
+		Logger:   zap.NewNop(),
 		Callback: callback,
 		Name:     "TestApp",
 	})
@@ -173,11 +182,13 @@ func TestProcessMessage(t *testing.T) {
 		}
 	}
 
-	w := worker.NewWorker(worker.WorkerConfig{
+	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+	w := worker.NewWorker(sess, worker.WorkerConfig{
 		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 		Workers:  1,
 		Region:   "us-east-1",
+		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
 		Callback: callback,
 		Name:     "TestApp",

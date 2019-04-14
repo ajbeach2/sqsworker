@@ -1,7 +1,10 @@
-# sqsworker [![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
-sqs consumer written in go
+# sqsworker 
+Concurrent SQS Consumer written on Go
 
-## Overview
+[![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
+[![GoDoc](https://godoc.org/github.com/ajbeach2/sqsworker?status.svg)](https://godoc.org/github.com/ajbeach2/sqsworker)
+
+## Documentation
 
 The Worker type represents a SQS consumer that can process sqs messages from a
 SQS queue and optionally send the results to a queue. The inenteded use is

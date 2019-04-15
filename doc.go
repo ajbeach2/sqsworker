@@ -8,7 +8,7 @@
 //
 // The inenteded use of this package is for multiple consumers reading
 // from the same queue. Consumers are represeted by concurrent handler functions
-// hat are managed by the Worker type. This package only does long-polling based sqs recieves.
+// that are managed by the Worker type. This package only does long-polling based sqs recieves.
 //
 // To use his package, first define a handler function. This can also be a closure:
 //

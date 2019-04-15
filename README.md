@@ -3,6 +3,7 @@ Concurrent SQS Consumer written on Go
 
 [![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
 [![GoDoc](https://godoc.org/github.com/ajbeach2/sqsworker?status.svg)](https://godoc.org/github.com/ajbeach2/sqsworker)
+[![Maintainability](https://api.codeclimate.com/v1/badges/a1b4d81620ea0c71f47c/maintainability)](https://codeclimate.com/github/ajbeach2/sqsworker/maintainability)
 
 ## Documentation
 

@@ -9,6 +9,7 @@ jobs:
     working_directory: /go/src/github.com/ajbeach2/sqsworker
     steps:
       - checkout
+      - run: go get -u golang.org/x/lint/golint
       - run: go get -v -t -d ./...
       - run:
           name: "Create a temp directory for artifacts"
@@ -23,6 +24,7 @@ jobs:
             go tool cover -html=c.out -o coverage.html
             cp coverage.html /tmp/artifacts
       - run: ./cc-test-reporter after-build --exit-code $?
+      - run: golint
       - store_artifacts:
           path: /tmp/artifacts
       

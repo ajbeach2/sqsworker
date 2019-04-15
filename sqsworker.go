@@ -13,27 +13,31 @@ import (
 	"time"
 )
 
-// Timeout for each handler function in seconds
+// DefaultTimeout for each handler function in seconds
 const DefaultTimeout = 30
 
-// Number of worker goroutines to spawn, each runs the handler function
+// DefaultWorkers Number of worker goroutines to spawn, each runs the handler function
 const DefaultWorkers = 1
 
-// Default amount of messages received by each SQS request
+// DefaultMaxNumberOfMessages amount of messages received by each SQS request
 const DefaultMaxNumberOfMessages = 10
 
-// SQS visibility Timeout
+// DefaultVisibilityTimeout SQS visibility Timeout
 const DefaultVisibilityTimeout = 60
 
-// Long-polling interval for SQS
+// DefaultWaitTimeSeconds Long-polling interval for SQS
 const DefaultWaitTimeSeconds = 20
 
+// Handler for SQS consumers
 type Handler func(context.Context, *sqs.Message) ([]byte, error)
+
+// Callback which is passed result from handler on success
 type Callback func([]byte, error)
 
+// Worker encapsulates the SQS consumer
 type Worker struct {
-	QueueInUrl  string
-	QueueOutUrl string
+	QueueInURL  string
+	QueueOutURL string
 	Queue       sqsiface.SQSAPI
 	Session     *session.Session
 	Consumers   int
@@ -45,6 +49,7 @@ type Worker struct {
 	done        chan error
 }
 
+// WorkerConfig settings for Worker to be passed in NewWorker Contstuctor
 type WorkerConfig struct {
 	QueueIn  string
 	QueueOut string
@@ -62,6 +67,7 @@ type consumerDone struct {
 	Err    error
 }
 
+// HandlerTimeoutError for handler function time's out
 type HandlerTimeoutError struct{}
 
 func (HandlerTimeoutError) Error() string {
@@ -109,7 +115,7 @@ func (w *Worker) deleteMessage(m *sqs.DeleteMessageInput) error {
 }
 
 func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
-	if w.QueueOutUrl == "" {
+	if w.QueueOutURL == "" {
 		return nil
 	}
 	_, err := w.Queue.SendMessage(msg)
@@ -138,8 +144,8 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 }
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
-	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutUrl}
-	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInUrl}
+	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutURL}
+	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
 	hanlderInput := w.getHandlerParams()
 	var msgString string
 
@@ -176,7 +182,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 
 func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 	params := &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(w.QueueInUrl),
+		QueueUrl:            aws.String(w.QueueInURL),
 		MaxNumberOfMessages: aws.Int64(DefaultMaxNumberOfMessages),
 		VisibilityTimeout:   aws.Int64(DefaultVisibilityTimeout),
 		WaitTimeSeconds:     aws.Int64(DefaultWaitTimeSeconds),
@@ -203,10 +209,12 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 	}
 }
 
+// Close function will send a signal to all workers to exit
 func (w *Worker) Close() {
 	close(w.done)
 }
 
+// Run does the main consumer/producer loop
 func (w *Worker) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	messages := make(chan *sqs.Message, w.Consumers)
@@ -235,6 +243,7 @@ func (w *Worker) Run() {
 	wg.Wait()
 }
 
+// NewWorker constructor for SQS Worker
 func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	var logger *zap.Logger
 	var timeout = wc.Timeout

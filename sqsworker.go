@@ -19,7 +19,7 @@ const DefaultTimeout = 30
 // Number of worker goroutines to spawn, each runs the handler function
 const DefaultWorkers = 1
 
-// Default amount of messages recieved by each SQS request
+// Default amount of messages received by each SQS request
 const DefaultMaxNumberOfMessages = 10
 
 // SQS visibility Timeout
@@ -190,7 +190,7 @@ func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 			req, resp := w.Queue.ReceiveMessageRequest(params)
 			err := req.Send()
 			if err != nil {
-				w.logError("recieve messages failed!", err)
+				w.logError("receive messages failed!", err)
 			} else {
 				messages := resp.Messages
 				if len(messages) > 0 {

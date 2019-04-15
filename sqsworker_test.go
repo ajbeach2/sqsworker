@@ -20,7 +20,7 @@ type MockQueue struct {
 	In      chan string
 	Out     chan string
 	req     *request.Request
-	recieve *sqs.ReceiveMessageOutput
+	receive *sqs.ReceiveMessageOutput
 }
 
 var Msg string
@@ -31,8 +31,8 @@ func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMes
 
 func (m *MockQueue) ReceiveMessageRequest(input *sqs.ReceiveMessageInput) (*request.Request, *sqs.ReceiveMessageOutput) {
 	Msg = <-m.In
-	m.recieve.Messages[0].Body = &Msg
-	return m.req, m.recieve
+	m.receive.Messages[0].Body = &Msg
+	return m.req, m.receive
 }
 
 func (m *MockQueue) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
@@ -58,7 +58,7 @@ func GetMockeQueue() *MockQueue {
 		In:  make(chan string),
 		Out: make(chan string),
 		req: &request.Request{},
-		recieve: &sqs.ReceiveMessageOutput{
+		receive: &sqs.ReceiveMessageOutput{
 			Messages: []*sqs.Message{{Body: nil}},
 		},
 	}

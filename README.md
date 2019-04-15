@@ -6,6 +6,7 @@ Concurrent SQS Consumer written on Go
 [![Maintainability](https://api.codeclimate.com/v1/badges/a1b4d81620ea0c71f47c/maintainability)](https://codeclimate.com/github/ajbeach2/sqsworker/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/a1b4d81620ea0c71f47c/test_coverage)](https://codeclimate.com/github/ajbeach2/sqsworker/test_coverage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ajbeach2/sqsworker)](https://goreportcard.com/report/github.com/ajbeach2/sqsworker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Documentation
 

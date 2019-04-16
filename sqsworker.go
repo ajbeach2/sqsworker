@@ -123,9 +123,6 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 }
 
 func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
-	if !hp.Timer.Stop() {
-		<-hp.Timer.C
-	}
 	hp.Timer.Reset(w.Timeout)
 
 	go func() {
@@ -137,6 +134,9 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 
 	select {
 	case result := <-hp.Done:
+		if !hp.Timer.Stop() {
+			<-hp.Timer.C
+		}
 		return result.Result, result.Err
 	case <-hp.Timer.C:
 		return nil, &HandlerTimeoutError{}

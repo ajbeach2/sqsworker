@@ -97,6 +97,7 @@ func BenchmarkWorker(b *testing.B) {
 }
 
 func TestTimeout(t *testing.T) {
+	t.Parallel()
 	queue := GetMockeQueue()
 
 	done := make(chan bool)
@@ -110,7 +111,7 @@ func TestTimeout(t *testing.T) {
 		if _, ok := err.(*sqsworker.HandlerTimeoutError); !ok {
 			t.Error("expected worker.HandlerTimeoutError error")
 		}
-		close(done)
+		done <- true
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -126,8 +127,10 @@ func TestTimeout(t *testing.T) {
 	w.Queue = queue
 
 	go func() {
-		queue.Push("hello")
-		<-done
+		for i := 0; i < 2; i++ {
+			queue.Push("hello")
+			<-done
+		}
 		w.Close()
 	}()
 
@@ -148,7 +151,7 @@ func TestError(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error")
 		}
-		close(done)
+		done <- true
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})

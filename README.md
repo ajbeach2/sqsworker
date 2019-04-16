@@ -39,16 +39,34 @@ is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in sec
 can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
 
 ```go
-sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-	QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-	QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
-	Workers:  4,
-	Timeout,  30, // Handler Timeout in seconds.
-	Handler:  handlerFunction,
-	Name:     "TestApp",
-})
-w.Run()
+package main
+
+import (
+	"context"
+	"github.com/ajbeach2/sqsworker"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sqs"
+	"strings"
+)
+
+func main() {
+	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
+		return []byte(strings.ToLower(*m.Body)), nil
+	}
+
+	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
+		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		Workers:  1,
+		Handler:  handlerFunction,
+		Name:     "TestApp",
+	})
+
+	w.Run()
+}
 ```  
 
 The worker will send messages to the QueueOut queue on succesfull runs.

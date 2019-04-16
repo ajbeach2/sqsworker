@@ -155,26 +155,26 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 			return
 		case msg := <-in:
 			result, err := w.exec(ctx, hanlderInput, msg)
-			if w.Callback != nil {
-				w.Callback(result, err)
-			}
-			if err != nil {
+			if err == nil {
+				msgString = string(result)
+				sendInput.MessageBody = &msgString
+				err = w.sendMessage(sendInput)
+				if err != nil {
+					w.logError("send message failed!", err)
+					continue
+				}
+				deleteInput.ReceiptHandle = msg.ReceiptHandle
+				err = w.deleteMessage(deleteInput)
+				if err != nil {
+					w.logError("delete message failed!", err)
+					continue
+				}
+			} else {
 				w.logError("handler failed!", err)
-				continue
-			}
-			msgString = string(result)
-			sendInput.MessageBody = &msgString
-			err = w.sendMessage(sendInput)
-			if err != nil {
-				w.logError("send message failed!", err)
-				continue
 			}
 
-			deleteInput.ReceiptHandle = msg.ReceiptHandle
-			err = w.deleteMessage(deleteInput)
-			if err != nil {
-				w.logError("delete message failed!", err)
-				continue
+			if w.Callback != nil {
+				w.Callback(result, err)
 			}
 		}
 	}

@@ -161,13 +161,11 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 				err = w.sendMessage(sendInput)
 				if err != nil {
 					w.logError("send message failed!", err)
-					continue
 				}
 				deleteInput.ReceiptHandle = msg.ReceiptHandle
 				err = w.deleteMessage(deleteInput)
 				if err != nil {
 					w.logError("delete message failed!", err)
-					continue
 				}
 			} else {
 				w.logError("handler failed!", err)

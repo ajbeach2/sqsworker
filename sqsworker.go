@@ -148,13 +148,15 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
 	hanlderInput := w.getHandlerParams()
 	var msgString string
+	var err error
+	var result []byte
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-			result, err := w.exec(ctx, hanlderInput, msg)
+			result, err = w.exec(ctx, hanlderInput, msg)
 			if err == nil {
 				msgString = string(result)
 				sendInput.MessageBody = &msgString

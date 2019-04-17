@@ -21,17 +21,18 @@ type MockQueue struct {
 	Out     chan string
 	req     *request.Request
 	receive *sqs.ReceiveMessageOutput
+	Msg     string
 }
-
-var Msg string
 
 func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
 	return nil, nil
 }
 
 func (m *MockQueue) ReceiveMessageRequest(input *sqs.ReceiveMessageInput) (*request.Request, *sqs.ReceiveMessageOutput) {
-	Msg = <-m.In
-	m.receive.Messages[0].Body = &Msg
+	m.Msg, _ = <-m.In
+
+	m.receive.Messages[0].Body = &m.Msg
+
 	return m.req, m.receive
 }
 
@@ -61,6 +62,7 @@ func GetMockeQueue() *MockQueue {
 		receive: &sqs.ReceiveMessageOutput{
 			Messages: []*sqs.Message{{Body: nil}},
 		},
+		Msg: "",
 	}
 }
 
@@ -95,7 +97,10 @@ func BenchmarkWorker(b *testing.B) {
 }
 
 func TestTimeout(t *testing.T) {
+	t.Parallel()
 	queue := GetMockeQueue()
+
+	done := make(chan bool)
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
 		time.Sleep(3 * time.Second)
@@ -106,6 +111,7 @@ func TestTimeout(t *testing.T) {
 		if _, ok := err.(*sqsworker.HandlerTimeoutError); !ok {
 			t.Error("expected worker.HandlerTimeoutError error")
 		}
+		done <- true
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -121,8 +127,10 @@ func TestTimeout(t *testing.T) {
 	w.Queue = queue
 
 	go func() {
-		queue.Push("hello")
-		time.Sleep(1 * time.Second)
+		for i := 0; i < 2; i++ {
+			queue.Push("hello")
+			<-done
+		}
 		w.Close()
 	}()
 
@@ -133,6 +141,7 @@ func TestTimeout(t *testing.T) {
 
 func TestError(t *testing.T) {
 	queue := GetMockeQueue()
+	done := make(chan bool)
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
 		return []byte(*m.Body), errors.New("test error")
@@ -142,6 +151,7 @@ func TestError(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error")
 		}
+		done <- true
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -156,7 +166,8 @@ func TestError(t *testing.T) {
 	w.Queue = queue
 
 	go func() {
-		queue.Push("hello")
+		queue.Push("hello") // No message are sent on error, so no pop needed
+		<-done
 		w.Close()
 	}()
 
@@ -167,6 +178,7 @@ func TestError(t *testing.T) {
 
 func TestProcessMessage(t *testing.T) {
 	queue := GetMockeQueue()
+	done := make(chan bool)
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
 		transform := fmt.Sprint(*m.Body, " ", "world")
@@ -177,6 +189,7 @@ func TestProcessMessage(t *testing.T) {
 		if string(result) != "hello world" {
 			t.Error("Expected: ", "hello world", "Actual: ", string(result))
 		}
+		close(done)
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -194,6 +207,7 @@ func TestProcessMessage(t *testing.T) {
 	go func() {
 		queue.Push("hello")
 		queue.Pop()
+		<-done
 		w.Close()
 	}()
 

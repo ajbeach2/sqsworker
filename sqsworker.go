@@ -123,9 +123,6 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 }
 
 func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
-	if !hp.Timer.Stop() {
-		<-hp.Timer.C
-	}
 	hp.Timer.Reset(w.Timeout)
 
 	go func() {
@@ -137,6 +134,9 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 
 	select {
 	case result := <-hp.Done:
+		if !hp.Timer.Stop() {
+			<-hp.Timer.C
+		}
 		return result.Result, result.Err
 	case <-hp.Timer.C:
 		return nil, &HandlerTimeoutError{}
@@ -148,33 +148,33 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
 	hanlderInput := w.getHandlerParams()
 	var msgString string
+	var err error
+	var result []byte
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-			result, err := w.exec(ctx, hanlderInput, msg)
-			if w.Callback != nil {
-				w.Callback(result, err)
-			}
-			if err != nil {
+			result, err = w.exec(ctx, hanlderInput, msg)
+			if err == nil {
+				msgString = string(result)
+				sendInput.MessageBody = &msgString
+				err = w.sendMessage(sendInput)
+				if err != nil {
+					w.logError("send message failed!", err)
+				}
+				deleteInput.ReceiptHandle = msg.ReceiptHandle
+				err = w.deleteMessage(deleteInput)
+				if err != nil {
+					w.logError("delete message failed!", err)
+				}
+			} else {
 				w.logError("handler failed!", err)
-				continue
-			}
-			msgString = string(result)
-			sendInput.MessageBody = &msgString
-			err = w.sendMessage(sendInput)
-			if err != nil {
-				w.logError("send message failed!", err)
-				continue
 			}
 
-			deleteInput.ReceiptHandle = msg.ReceiptHandle
-			err = w.deleteMessage(deleteInput)
-			if err != nil {
-				w.logError("delete message failed!", err)
-				continue
+			if w.Callback != nil {
+				w.Callback(result, err)
 			}
 		}
 	}

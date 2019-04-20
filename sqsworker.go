@@ -82,13 +82,15 @@ type handlerParams struct {
 	Done   chan *consumerDone
 	Result *consumerDone
 	Timer  *time.Timer
+	ID     int
 }
 
-func (w *Worker) getHandlerParams() *handlerParams {
+func (w *Worker) getHandlerParams(id int) *handlerParams {
 	return &handlerParams{
 		make(chan *consumerDone),
 		&consumerDone{},
 		time.NewTimer(w.Timeout),
+		id,
 	}
 }
 
@@ -126,11 +128,11 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 	return err
 }
 
-func (w *Worker) collectMetric(name, unit string, metric float64) error {
+func (w *Worker) collectMetric(name, unit string, id int, metric float64) error {
 	params := &cloudwatch.PutMetricDataInput{
 		MetricData: []*cloudwatch.MetricDatum{
 			{
-				MetricName: aws.String("HandlerExecutionTime"),
+				MetricName: aws.String(name),
 				Dimensions: []*cloudwatch.Dimension{
 					{
 						Name:  aws.String("HandlerMetrics"),
@@ -140,6 +142,18 @@ func (w *Worker) collectMetric(name, unit string, metric float64) error {
 				Timestamp: aws.Time(time.Now()),
 				Unit:      aws.String(unit),
 				Value:     aws.Float64(metric),
+			},
+			{
+				MetricName: aws.String("HandlerInvocations"),
+				Dimensions: []*cloudwatch.Dimension{
+					{
+						Name:  aws.String("HandlerMetrics"),
+						Value: aws.String(w.Name),
+					},
+				},
+				Timestamp: aws.Time(time.Now()),
+				Unit:      aws.String("Count"),
+				Value:     aws.Float64(1),
 			},
 		},
 		Namespace: aws.String("SqsWorker"),
@@ -153,11 +167,7 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 	hp.Timer.Reset(w.Timeout)
 
 	go func() {
-		start := time.Now()
 		result, err := w.Handler(ctx, m)
-		end := time.Now()
-		diff := end.Sub(start)
-		go w.collectMetric("HandlerExecutionTime", "Seconds", diff.Seconds())
 		hp.Result.Result = result
 		hp.Result.Err = err
 		hp.Done <- hp.Result
@@ -174,10 +184,10 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 	}
 }
 
-func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
+func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message, id int) {
 	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutURL}
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
-	hanlderInput := w.getHandlerParams()
+	hanlderInput := w.getHandlerParams(id)
 	var msgString string
 	var err error
 	var result []byte
@@ -187,9 +197,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-
 			result, err = w.exec(ctx, hanlderInput, msg)
-
 			if err == nil {
 				msgString = string(result)
 				sendInput.MessageBody = &msgString
@@ -268,10 +276,10 @@ func (w *Worker) Run() {
 	var wg sync.WaitGroup
 	for x := 0; x < w.Consumers; x++ {
 		wg.Add(1)
-		go func() {
+		go func(id int) {
 			defer wg.Done()
-			w.consumer(ctx, messages)
-		}()
+			w.consumer(ctx, messages, id)
+		}(x)
 	}
 	wg.Wait()
 }

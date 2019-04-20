@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
@@ -47,6 +48,7 @@ type Worker struct {
 	Name        string
 	Timeout     time.Duration
 	done        chan error
+	metrics     *cloudwatch.CloudWatch
 }
 
 // WorkerConfig settings for Worker to be passed in NewWorker Contstuctor
@@ -68,10 +70,12 @@ type consumerDone struct {
 }
 
 // HandlerTimeoutError for handler function time's out
-type HandlerTimeoutError struct{}
+type HandlerTimeoutError struct {
+	message string
+}
 
-func (HandlerTimeoutError) Error() string {
-	return "Handler Timeout!"
+func (h *HandlerTimeoutError) Error() string {
+	return fmt.Sprint("Handler Timeout!", h.message)
 }
 
 type handlerParams struct {
@@ -122,11 +126,38 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 	return err
 }
 
+func (w *Worker) collectMetric(name, unit string, metric float64) error {
+	params := &cloudwatch.PutMetricDataInput{
+		MetricData: []*cloudwatch.MetricDatum{
+			{
+				MetricName: aws.String("HandlerExecutionTime"),
+				Dimensions: []*cloudwatch.Dimension{
+					{
+						Name:  aws.String("HandlerMetrics"),
+						Value: aws.String(w.Name),
+					},
+				},
+				Timestamp: aws.Time(time.Now()),
+				Unit:      aws.String(unit),
+				Value:     aws.Float64(metric),
+			},
+		},
+		Namespace: aws.String("SqsWorker"),
+	}
+
+	_, err := w.metrics.PutMetricData(params)
+	return err
+}
+
 func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
 	hp.Timer.Reset(w.Timeout)
 
 	go func() {
+		start := time.Now()
 		result, err := w.Handler(ctx, m)
+		end := time.Now()
+		diff := end.Sub(start)
+		go w.collectMetric("HandlerExecutionTime", "Seconds", diff.Seconds())
 		hp.Result.Result = result
 		hp.Result.Err = err
 		hp.Done <- hp.Result
@@ -139,7 +170,7 @@ func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([
 		}
 		return result.Result, result.Err
 	case <-hp.Timer.C:
-		return nil, &HandlerTimeoutError{}
+		return nil, &HandlerTimeoutError{*m.Body}
 	}
 }
 
@@ -156,7 +187,9 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
+
 			result, err = w.exec(ctx, hanlderInput, msg)
+
 			if err == nil {
 				msgString = string(result)
 				sendInput.MessageBody = &msgString
@@ -275,5 +308,6 @@ func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 		wc.Name,
 		time.Duration(timeout) * time.Second,
 		make(chan error),
+		cloudwatch.New(sess),
 	}
 }

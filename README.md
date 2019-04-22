@@ -15,7 +15,7 @@ Concurrent SQS Consumer written on Go
 ## Documentation
 
 The Worker type represents a SQS consumer that can process sqs messages from a
-SQS queue and optionally send the results to a queue. The inenteded use is
+SQS queue and optionally send the results to a queue. The intended use is
 multiple concurrent consumers reading from the same queue which execute the
 hander function defined on the Worker struct.
 
@@ -35,8 +35,7 @@ type Handler func(context.Context, *sqs.Message) ([]byte, error)
 
 A Worker Struct can be initialized with the NewWorker method, and you may optionally
 define an outbound queue, and number of concurrent workers. If the number of workers
-is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in seconds
-can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
+is not set, the number of workers defaults to runtime.NumCPU().
 
 ```go
 package main

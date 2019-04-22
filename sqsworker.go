@@ -10,11 +10,7 @@ import (
 	"go.uber.org/zap"
 	"runtime"
 	"sync"
-	"time"
 )
-
-// DefaultTimeout for each handler function in seconds
-const DefaultTimeout = 30
 
 // DefaultWorkers Number of worker goroutines to spawn, each runs the handler function
 const DefaultWorkers = 1
@@ -45,7 +41,6 @@ type Worker struct {
 	Handler     Handler
 	Callback    Callback
 	Name        string
-	Timeout     time.Duration
 	done        chan error
 }
 
@@ -58,34 +53,7 @@ type WorkerConfig struct {
 	Handler  Handler
 	Callback Callback
 	Name     string
-	Timeout  int
 	Logger   *zap.Logger
-}
-
-type consumerDone struct {
-	Result []byte
-	Err    error
-}
-
-// HandlerTimeoutError for handler function time's out
-type HandlerTimeoutError struct{}
-
-func (HandlerTimeoutError) Error() string {
-	return "Handler Timeout!"
-}
-
-type handlerParams struct {
-	Done   chan *consumerDone
-	Result *consumerDone
-	Timer  *time.Timer
-}
-
-func (w *Worker) getHandlerParams() *handlerParams {
-	return &handlerParams{
-		make(chan *consumerDone),
-		&consumerDone{},
-		time.NewTimer(w.Timeout),
-	}
 }
 
 func (w *Worker) logError(msg string, err error) {
@@ -122,31 +90,9 @@ func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
 	return err
 }
 
-func (w *Worker) exec(ctx context.Context, hp *handlerParams, m *sqs.Message) ([]byte, error) {
-	hp.Timer.Reset(w.Timeout)
-
-	go func() {
-		result, err := w.Handler(ctx, m)
-		hp.Result.Result = result
-		hp.Result.Err = err
-		hp.Done <- hp.Result
-	}()
-
-	select {
-	case result := <-hp.Done:
-		if !hp.Timer.Stop() {
-			<-hp.Timer.C
-		}
-		return result.Result, result.Err
-	case <-hp.Timer.C:
-		return nil, &HandlerTimeoutError{}
-	}
-}
-
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutURL}
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
-	hanlderInput := w.getHandlerParams()
 	var msgString string
 	var err error
 	var result []byte
@@ -156,7 +102,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-			result, err = w.exec(ctx, hanlderInput, msg)
+			result, err = w.Handler(ctx, msg)
 			if err == nil {
 				msgString = string(result)
 				sendInput.MessageBody = &msgString
@@ -246,12 +192,7 @@ func (w *Worker) Run() {
 // NewWorker constructor for SQS Worker
 func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	var logger *zap.Logger
-	var timeout = wc.Timeout
 	workers := runtime.NumCPU()
-
-	if wc.Timeout == 0 {
-		timeout = DefaultTimeout
-	}
 
 	if wc.Workers != 0 {
 		workers = wc.Workers
@@ -273,7 +214,6 @@ func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 		wc.Handler,
 		wc.Callback,
 		wc.Name,
-		time.Duration(timeout) * time.Second,
 		make(chan error),
 	}
 }

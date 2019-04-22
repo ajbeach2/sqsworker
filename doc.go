@@ -22,21 +22,19 @@
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
 // define an outbound queue, and number of concurrent workers. If the number of workers
-// is not set, the number of workers defaults to runtime.NumCPU(). A Timeout in seconds
-// can be set where a handler will fail on a Timeout. The default, if this is not set, is 30 seconds.
+// is not set, the number of workers defaults to runtime.NumCPU().
 //
 //	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 //	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 //		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 //		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
 //		Workers:  4,
-//		Timeout,  30, // Handler Timeout in seconds.
 //		Handler:  handlerFunction,
 //		Name:     "TestApp",
 //	})
 //	w.Run()
 //
-// The worker will send messages to the QueuOut queue on succesfull runs.
+// The worker will send messages to the QueuOut queue on successful runs.
 //
 // Concurrency
 //

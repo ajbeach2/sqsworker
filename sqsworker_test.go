@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
 	"testing"
-	"time"
 )
 
 type MockQueue struct {
@@ -94,49 +93,6 @@ func BenchmarkWorker(b *testing.B) {
 
 	w.Run()
 	queue.Close()
-}
-
-func TestTimeout(t *testing.T) {
-	t.Parallel()
-	queue := GetMockeQueue()
-
-	done := make(chan bool)
-
-	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		time.Sleep(3 * time.Second)
-		return []byte(*m.Body), nil
-	}
-
-	var callback = func(result []byte, err error) {
-		if _, ok := err.(*sqsworker.HandlerTimeoutError); !ok {
-			t.Error("expected worker.HandlerTimeoutError error")
-		}
-		done <- true
-	}
-
-	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
-	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		Workers:  1,
-		Handler:  handlerFunction,
-		Logger:   zap.NewNop(),
-		Callback: callback,
-		Name:     "TestApp",
-		Timeout:  1,
-	})
-	w.Queue = queue
-
-	go func() {
-		for i := 0; i < 2; i++ {
-			queue.Push("hello")
-			<-done
-		}
-		w.Close()
-	}()
-
-	w.Run()
-	queue.Close()
-	return
 }
 
 func TestError(t *testing.T) {

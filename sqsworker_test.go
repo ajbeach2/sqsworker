@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/aws-sdk-go/service/sns/snsiface"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
@@ -65,9 +67,37 @@ func GetMockeQueue() *MockQueue {
 	}
 }
 
+type MockTopic struct {
+	snsiface.SNSAPI
+	In  chan string
+	Msg string
+}
+
+func (t *MockTopic) Close() {
+	close(t.In)
+}
+
+func (t *MockTopic) Publish(input *sns.PublishInput) (*sns.PublishOutput, error) {
+	t.In <- *input.Message
+	return nil, nil
+}
+
+func (t *MockTopic) GetMessage() *string {
+	t.Msg, _ = <-t.In
+	return &t.Msg
+}
+
+func GetMockeTopic() *MockTopic {
+	return &MockTopic{
+		In:  make(chan string),
+		Msg: "",
+	}
+}
+
 func BenchmarkWorker(b *testing.B) {
 	b.ReportAllocs()
 	queue := GetMockeQueue()
+	topic := GetMockeTopic()
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
 		return []byte{}, nil
@@ -75,24 +105,26 @@ func BenchmarkWorker(b *testing.B) {
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
 		Workers:  1,
 		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
 		Name:     "TestApp",
 	})
 	w.Queue = queue
+	w.Topic = topic
 	go func() {
 		for i := 0; i < b.N; i++ {
 			queue.Push("")
-			queue.Pop()
+			topic.GetMessage()
 		}
 		w.Close()
 	}()
 
 	w.Run()
 	queue.Close()
+	topic.Close()
 }
 
 func TestError(t *testing.T) {
@@ -112,7 +144,7 @@ func TestError(t *testing.T) {
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
 		Workers:  1,
 		Handler:  handlerFunction,
 		Logger:   zap.NewNop(),
@@ -134,6 +166,7 @@ func TestError(t *testing.T) {
 
 func TestProcessMessage(t *testing.T) {
 	queue := GetMockeQueue()
+	topic := GetMockeTopic()
 	done := make(chan bool)
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
@@ -150,8 +183,8 @@ func TestProcessMessage(t *testing.T) {
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
 		Workers:  1,
 		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
@@ -159,15 +192,22 @@ func TestProcessMessage(t *testing.T) {
 		Name:     "TestApp",
 	})
 	w.Queue = queue
+	w.Topic = topic
 
 	go func() {
 		queue.Push("hello")
-		queue.Pop()
+		out := topic.GetMessage()
+
+		if *out != "hello world" {
+			t.Error("topic message does not match \"hello world\"", *out)
+		}
+
 		<-done
 		w.Close()
 	}()
 
 	w.Run()
 	queue.Close()
+	topic.Close()
 	return
 }

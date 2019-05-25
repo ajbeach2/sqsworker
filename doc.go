@@ -2,7 +2,7 @@
 // license that can be found in the LICENSE file.
 
 // Package sqsworker implements a SQS consumer that can process sqs messages from a
-// SQS queue and optionally send the results to a result queue.
+// SQS queue and optionally send the results to a result tpoic.
 //
 // Overview
 //
@@ -21,20 +21,20 @@
 //	type Handler func(context.Context, *sqs.Message) ([]byte, error)
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
-// define an outbound queue, and number of concurrent workers. If the number of workers
+// define an outbound topic, and number of concurrent workers. If the number of workers
 // is not set, the number of workers defaults to runtime.NumCPU().
 //
 //	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 //	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-//		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-//		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+//		QueueUrl:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+//		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
 //		Workers:  4,
 //		Handler:  handlerFunction,
 //		Name:     "TestApp",
 //	})
 //	w.Run()
 //
-// The worker will send messages to the QueuOut queue on successful runs.
+// The worker will send messages to the TopicArn on successful runs.
 //
 // Concurrency
 //

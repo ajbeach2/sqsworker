@@ -17,8 +17,8 @@ func ExampleWorker() {
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
 		Workers:  1,
 		Handler:  handlerFunction,
 		Name:     "TestApp",

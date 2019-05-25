@@ -15,7 +15,7 @@ Concurrent SQS Consumer written on Go
 ## Documentation
 
 The Worker type represents a SQS consumer that can process sqs messages from a
-SQS queue and optionally send the results to a queue. The intended use is
+SQS queue and optionally send the results to a topic. The intended use is
 multiple concurrent consumers reading from the same queue which execute the
 hander function defined on the Worker struct.
 
@@ -34,7 +34,7 @@ type Handler func(context.Context, *sqs.Message) ([]byte, error)
 ```
 
 A Worker Struct can be initialized with the NewWorker method, and you may optionally
-define an outbound queue, and number of concurrent workers. If the number of workers
+define an outbound topic, and number of concurrent workers. If the number of workers
 is not set, the number of workers defaults to runtime.NumCPU().
 
 ```go
@@ -57,8 +57,8 @@ func main() {
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueIn:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		QueueOut: "https://sqs.us-east-1.amazonaws.com/88888888888/Out",
+		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
 		Workers:  1,
 		Handler:  handlerFunction,
 		Name:     "TestApp",
@@ -68,7 +68,7 @@ func main() {
 }
 ```  
 
-The worker will send messages to the QueueOut queue on succesfull runs.
+The worker will send messages to the TopicArn topic on succesfull runs.
 
 ## Concurrency
 
@@ -77,7 +77,7 @@ and it is best to ensure that handler function can be executed concurrently, esp
 
 ## Performance
 
-Real world performace will be dictated by latency to sqs. The benchmarks mock sqs calls to illustrate that
+Real world performace will be dictated by latency to sqs. The benchmarks mock sqs and sns calls to illustrate that
 the package adds very little overhead to consuming messages, and to ensure that memory is managed to not
 create more garbage collection than needed.
 
@@ -94,9 +94,9 @@ model name	: Intel(R) Core(TM) i5-6600K CPU @ 3.50GHz
 goos: linux
 goarch: amd64
 pkg: github.com/ajbeach2/sqsworker
-BenchmarkWorker-4   	 1000000	      1395 ns/op	       0 B/op	       0 allocs/op
+BenchmarkWorker-4   	 2000000	       777 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/ajbeach2/sqsworker	2.427s
+ok  	github.com/ajbeach2/sqsworker	2.307s
 
 ```
 

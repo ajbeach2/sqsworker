@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/aws-sdk-go/service/sns/snsiface"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
@@ -32,22 +34,23 @@ type Callback func([]byte, error)
 
 // Worker encapsulates the SQS consumer
 type Worker struct {
-	QueueInURL  string
-	QueueOutURL string
-	Queue       sqsiface.SQSAPI
-	Session     *session.Session
-	Consumers   int
-	Logger      *zap.Logger
-	Handler     Handler
-	Callback    Callback
-	Name        string
-	done        chan error
+	QueueUrl  string
+	TopicArn  string
+	Queue     sqsiface.SQSAPI
+	Topic     snsiface.SNSAPI
+	Session   *session.Session
+	Consumers int
+	Logger    *zap.Logger
+	Handler   Handler
+	Callback  Callback
+	Name      string
+	done      chan error
 }
 
 // WorkerConfig settings for Worker to be passed in NewWorker Contstuctor
 type WorkerConfig struct {
-	QueueIn  string
-	QueueOut string
+	QueueUrl string
+	TopicArn string
 	// If the number of workers is 0, the number of workers defaults to runtime.NumCPU()
 	Workers  int
 	Handler  Handler
@@ -82,17 +85,17 @@ func (w *Worker) deleteMessage(m *sqs.DeleteMessageInput) error {
 	return nil
 }
 
-func (w *Worker) sendMessage(msg *sqs.SendMessageInput) error {
-	if w.QueueOutURL == "" {
+func (w *Worker) sendMessage(msg *sns.PublishInput) error {
+	if w.TopicArn == "" {
 		return nil
 	}
-	_, err := w.Queue.SendMessage(msg)
+	_, err := w.Topic.Publish(msg)
 	return err
 }
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
-	sendInput := &sqs.SendMessageInput{QueueUrl: &w.QueueOutURL}
-	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueInURL}
+	sendInput := &sns.PublishInput{TopicArn: &w.TopicArn}
+	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueUrl}
 	var msgString string
 	var err error
 	var result []byte
@@ -105,7 +108,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 			result, err = w.Handler(ctx, msg)
 			if err == nil {
 				msgString = string(result)
-				sendInput.MessageBody = &msgString
+				sendInput.Message = &msgString
 				err = w.sendMessage(sendInput)
 				if err != nil {
 					w.logError("send message failed!", err)
@@ -128,7 +131,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 
 func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 	params := &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(w.QueueInURL),
+		QueueUrl:            aws.String(w.QueueUrl),
 		MaxNumberOfMessages: aws.Int64(DefaultMaxNumberOfMessages),
 		VisibilityTimeout:   aws.Int64(DefaultVisibilityTimeout),
 		WaitTimeSeconds:     aws.Int64(DefaultWaitTimeSeconds),
@@ -205,9 +208,10 @@ func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	}
 
 	return &Worker{
-		wc.QueueIn,
-		wc.QueueOut,
+		wc.QueueUrl,
+		wc.TopicArn,
 		sqs.New(sess),
+		sns.New(sess),
 		sess,
 		workers,
 		logger,

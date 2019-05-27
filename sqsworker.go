@@ -27,10 +27,10 @@ const DefaultVisibilityTimeout = 60
 const DefaultWaitTimeSeconds = 20
 
 // Handler for SQS consumers
-type Handler func(context.Context, *sqs.Message) ([]byte, error)
+type Handler func(context.Context, *sqs.Message, *sns.PublishInput) error
 
 // Callback which is passed result from handler on success
-type Callback func([]byte, error)
+type Callback func(*string, error)
 
 // Worker encapsulates the SQS consumer
 type Worker struct {
@@ -89,26 +89,28 @@ func (w *Worker) sendMessage(msg *sns.PublishInput) error {
 	if w.TopicArn == "" {
 		return nil
 	}
+
+	if msg.Message == nil {
+		return nil
+	}
+
 	_, err := w.Topic.Publish(msg)
 	return err
 }
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
-	sendInput := &sns.PublishInput{TopicArn: &w.TopicArn}
-	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueUrl}
 	var msgString string
+	sendInput := &sns.PublishInput{TopicArn: &w.TopicArn, Message: &msgString}
+	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueUrl}
 	var err error
-	var result []byte
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
-			result, err = w.Handler(ctx, msg)
+			err = w.Handler(ctx, msg, sendInput)
 			if err == nil {
-				msgString = string(result)
-				sendInput.Message = &msgString
 				err = w.sendMessage(sendInput)
 				if err != nil {
 					w.logError("send message failed!", err)
@@ -123,7 +125,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 			}
 
 			if w.Callback != nil {
-				w.Callback(result, err)
+				w.Callback(sendInput.Message, err)
 			}
 		}
 	}

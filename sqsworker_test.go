@@ -99,8 +99,9 @@ func BenchmarkWorker(b *testing.B) {
 	queue := GetMockeQueue()
 	topic := GetMockeTopic()
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		return []byte{}, nil
+	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+		*w.Message = ""
+		return nil
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -131,11 +132,12 @@ func TestError(t *testing.T) {
 	queue := GetMockeQueue()
 	done := make(chan bool)
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		return []byte(*m.Body), errors.New("test error")
+	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+		w.Message = m.Body
+		return errors.New("test error")
 	}
 
-	var callback = func(result []byte, err error) {
+	var callback = func(result *string, err error) {
 		if err == nil {
 			t.Error("Expected error")
 		}
@@ -169,14 +171,14 @@ func TestProcessMessage(t *testing.T) {
 	topic := GetMockeTopic()
 	done := make(chan bool)
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		transform := fmt.Sprint(*m.Body, " ", "world")
-		return []byte(transform), nil
+	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+		*w.Message = fmt.Sprint(*m.Body, " ", "world")
+		return nil
 	}
 
-	var callback = func(result []byte, err error) {
-		if string(result) != "hello world" {
-			t.Error("Expected: ", "hello world", "Actual: ", string(result))
+	var callback = func(result *string, err error) {
+		if *result != "hello world" {
+			t.Error("Expected: ", "hello world", "Actual: ", result)
 		}
 		close(done)
 	}

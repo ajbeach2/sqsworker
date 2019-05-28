@@ -10,7 +10,7 @@
 // from the same queue. Consumers are represeted by concurrent handler functions
 // that are managed by the Worker type. This package only does long-polling based sqs receives.
 //
-// To use his package, first define a handler function. This can also be a closure:
+// To use his package, first define a handler function.
 //
 //	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
 //		*w.Message = strings.ToLower(*m.Body)

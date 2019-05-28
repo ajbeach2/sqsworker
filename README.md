@@ -1,5 +1,5 @@
 # sqsworker 
-Concurrent SQS Consumer written on Go
+Concurrent SQS Consumer written on Go. ⚠️WARNING⚠️: This repo is under active development, and there may be rapid and incompatible changes.
 
 [![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
 [![GoDoc](https://godoc.org/github.com/ajbeach2/sqsworker?status.svg)](https://godoc.org/github.com/ajbeach2/sqsworker)

@@ -15,22 +15,23 @@ Concurrent SQS Consumer written on Go
 ## Documentation
 
 The Worker type represents a SQS consumer that can process sqs messages from a
-SQS queue and optionally send the results to a topic. The intended use is
+SQS queue and optionally send the results to a sns topic. The intended use is
 multiple concurrent consumers reading from the same queue which execute the
 hander function defined on the Worker struct.
 
 To use his package, first define a handler function. This can also be a closure:
 
 ```go
-var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-	return []byte(strings.ToLower(*m.Body)), nil
+var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+	*w.Message = strings.ToLower(*m.Body)
+	return nil
 }
  ```
 
 The function must match the following type definition:
 
 ```go
-type Handler func(context.Context, *sqs.Message) ([]byte, error)
+type Handler func(context.Context, *sqs.Message, *sns.PublishInput) error
 ```
 
 A Worker Struct can be initialized with the NewWorker method, and you may optionally
@@ -45,13 +46,15 @@ import (
 	"github.com/ajbeach2/sqsworker"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sns"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"strings"
 )
 
-func main() {
-	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-		return []byte(strings.ToLower(*m.Body)), nil
+func ExampleWorker() {
+	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+		*w.Message = strings.ToLower(*m.Body)
+		return nil
 	}
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
@@ -94,11 +97,7 @@ model name	: Intel(R) Core(TM) i5-6600K CPU @ 3.50GHz
 goos: linux
 goarch: amd64
 pkg: github.com/ajbeach2/sqsworker
-BenchmarkWorker-4   	 2000000	       777 ns/op	       0 B/op	       0 allocs/op
+BenchmarkWorker-4   	 2000000	       727 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/ajbeach2/sqsworker	2.307s
-
+ok  	github.com/ajbeach2/sqsworker	2.180s
 ```
-
-
-

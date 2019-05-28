@@ -12,13 +12,14 @@
 //
 // To use his package, first define a handler function. This can also be a closure:
 //
-//	var handlerFunction = func(ctx context.Context, m *sqs.Message) ([]byte, error) {
-//		return []byte(strings.ToLower(*m.Body)), nil
-// 	}
+//	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+//		*w.Message = strings.ToLower(*m.Body)
+//		return nil
+//	}
 //
 // The function must match the following type definition:
 //
-//	type Handler func(context.Context, *sqs.Message) ([]byte, error)
+//	type Handler func(context.Context, *sqs.Message, *sns.PublishInput) error
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
 // define an outbound topic, and number of concurrent workers. If the number of workers

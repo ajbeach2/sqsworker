@@ -100,15 +100,14 @@ func (w *Worker) sendMessage(msg *sns.PublishInput) error {
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	var msgString string
-	sendInput := &sns.PublishInput{TopicArn: &w.TopicArn, Message: &msgString}
 	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueUrl}
 	var err error
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-in:
+			sendInput := &sns.PublishInput{TopicArn: &w.TopicArn, Message: &msgString}
 			err = w.Handler(ctx, msg, sendInput)
 			if err == nil {
 				err = w.sendMessage(sendInput)

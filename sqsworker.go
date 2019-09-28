@@ -194,7 +194,7 @@ func (w *Worker) Run() {
 	wg.Wait()
 }
 
-func CreateQueue(name string, sqsc *sqs.SQS) (string, error) {
+func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	result, err := sqsc.CreateQueue(&sqs.CreateQueueInput{
 		QueueName: aws.String(name),
 	})
@@ -205,8 +205,8 @@ func CreateQueue(name string, sqsc *sqs.SQS) (string, error) {
 	return *result.QueueUrl, nil
 }
 
-func GetOrCreateQueue(name string, sess *session.Session) (string, error) {
-	sqsc := sqs.New(sess)
+func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
+	// sqsc := sqs.New(sess)
 	queueOut, err := sqsc.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: aws.String(name),
 	})
@@ -221,8 +221,8 @@ func GetOrCreateQueue(name string, sess *session.Session) (string, error) {
 	return *queueOut.QueueUrl, err
 }
 
-func GetOrCreateTopic(name string, sess *session.Session) (string, error) {
-	snsc := sns.New(sess)
+func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
+	// snsc := sns.New(sess)
 	if name == "" {
 		return "", nil
 	}

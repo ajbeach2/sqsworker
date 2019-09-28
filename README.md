@@ -61,7 +61,7 @@ func ExampleWorker() {
 
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
 		Workers:  1,
 		Handler:  handlerFunction,
 		Name:     "TestApp",

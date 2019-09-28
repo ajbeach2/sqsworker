@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ajbeach2/sqsworker"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sns"
@@ -23,6 +24,7 @@ type MockQueue struct {
 	req     *request.Request
 	receive *sqs.ReceiveMessageOutput
 	Msg     string
+	Error   awserr.Error
 }
 
 func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
@@ -53,6 +55,18 @@ func (m *MockQueue) Pop() string {
 func (m *MockQueue) Close() {
 	close(m.In)
 	close(m.Out)
+}
+
+func (m *MockQueue) GetQueueUrl(input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+	return &sqs.GetQueueUrlOutput{
+		QueueUrl: aws.String(fmt.Sprint("https://sqs.us-east-1.amazonaws.com/88888888888/", *input.QueueName)),
+	}, m.Error
+}
+
+func (m *MockQueue) CreateQueue(input *sqs.CreateQueueInput) (*sqs.CreateQueueOutput, error) {
+	return &sqs.CreateQueueOutput{
+		QueueUrl: aws.String(fmt.Sprint("https://sqs.us-east-1.amazonaws.com/88888888888/", *input.QueueName)),
+	}, nil
 }
 
 func GetMockeQueue() *MockQueue {
@@ -87,7 +101,13 @@ func (t *MockTopic) GetMessage() *string {
 	return &t.Msg
 }
 
-func GetMockeTopic() *MockTopic {
+func (t *MockTopic) CreateTopic(input *sns.CreateTopicInput) (*sns.CreateTopicOutput, error) {
+	return &sns.CreateTopicOutput{
+		TopicArn: aws.String(fmt.Sprint("arn:aws:sns:us-east-1:88888888888:", *input.Name)),
+	}, nil
+}
+
+func GetMockTopic() *MockTopic {
 	return &MockTopic{
 		In:  make(chan string),
 		Msg: "",
@@ -97,7 +117,7 @@ func GetMockeTopic() *MockTopic {
 func BenchmarkWorker(b *testing.B) {
 	b.ReportAllocs()
 	queue := GetMockeQueue()
-	topic := GetMockeTopic()
+	topic := GetMockTopic()
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
 		*w.Message = ""
@@ -107,7 +127,7 @@ func BenchmarkWorker(b *testing.B) {
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
 		Workers:  1,
 		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
@@ -168,7 +188,7 @@ func TestError(t *testing.T) {
 
 func TestProcessMessage(t *testing.T) {
 	queue := GetMockeQueue()
-	topic := GetMockeTopic()
+	topic := GetMockTopic()
 	done := make(chan bool)
 
 	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
@@ -186,7 +206,7 @@ func TestProcessMessage(t *testing.T) {
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
+		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
 		Workers:  1,
 		Logger:   zap.NewNop(),
 		Handler:  handlerFunction,
@@ -212,4 +232,41 @@ func TestProcessMessage(t *testing.T) {
 	queue.Close()
 	topic.Close()
 	return
+}
+
+func TestGetQueue(t *testing.T) {
+	queue := GetMockeQueue()
+	queueUrl, err := sqsworker.GetOrCreateQueue("In", queue)
+	if queueUrl != "https://sqs.us-east-1.amazonaws.com/88888888888/In" {
+		t.Error("Actual: ", queueUrl, "Expected: ", "https://sqs.us-east-1.amazonaws.com/88888888888/In")
+	}
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCreateQueue(t *testing.T) {
+	queue := GetMockeQueue()
+	queue.Error = awserr.New(sqs.ErrCodeQueueDoesNotExist, "Queue Does Not Exists", nil)
+	queueUrl, err := sqsworker.GetOrCreateQueue("In", queue)
+	if queueUrl != "https://sqs.us-east-1.amazonaws.com/88888888888/In" {
+		t.Error("Actual: ", queueUrl, "Expected: ", "https://sqs.us-east-1.amazonaws.com/88888888888/In")
+	}
+
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetOrCreateTopic(t *testing.T) {
+	topic := GetMockTopic()
+	topicArn, err := sqsworker.GetOrCreateTopic("Out", topic)
+	if topicArn != "arn:aws:sns:us-east-1:88888888888:Out" {
+		t.Error("Actual: ", topicArn, "Expected: ", "arn:aws:sns:us-east-1:88888888888:Out")
+	}
+
+	if err != nil {
+		t.Error(err)
+	}
 }

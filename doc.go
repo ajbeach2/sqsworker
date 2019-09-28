@@ -23,17 +23,23 @@
 //
 // A Worker Struct can be initialized with the NewWorker method, and you may optionally
 // define an outbound topic, and number of concurrent workers. If the number of workers
-// is not set, the number of workers defaults to runtime.NumCPU().
-//
+// is not set, the number of workers defaults to runtime.NumCPU().  There are helper functions
+// provided for getting or creating topcis and queues.
+
 //	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
+//	queueUrl, _ := sqsworker.GetOrCreateQueue("In", sqs.New(sess))
+//	topicArn, _ := sqsworker.GetOrCreateTopic("Out", sns.New(sess))
+
 //	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-//		QueueUrl:  "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-//		TopicArn: "arn:aws:sns:us-east-1:88888888888:out",
-//		Workers:  4,
-//		Handler:  handlerFunction,
-//		Name:     "TestApp",
-//	})
-//	w.Run()
+//	QueueUrl: queueUrl,
+//	TopicArn: topicArn,
+//	Workers:  1,
+//	Handler:  handlerFunction,
+//	Name:     "TestApp",
+// })
+
+// w.Run()
+
 //
 // The worker will send messages to the TopicArn on successful runs.
 //

@@ -18,8 +18,8 @@ func ExampleWorker() {
 
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 
-	queueUrl, _ := sqsworker.GetOrCreateQueue("In", sess)
-	topicArn, _ := sqsworker.GetOrCreateTopic("Out", sess)
+	queueUrl, _ := sqsworker.GetOrCreateQueue("In", sqs.New(sess))
+	topicArn, _ := sqsworker.GetOrCreateTopic("Out", sns.New(sess))
 
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
 		QueueUrl: queueUrl,

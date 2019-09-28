@@ -206,7 +206,6 @@ func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 }
 
 func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
-	// sqsc := sqs.New(sess)
 	queueOut, err := sqsc.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: aws.String(name),
 	})
@@ -222,7 +221,6 @@ func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 }
 
 func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
-	// snsc := sns.New(sess)
 	if name == "" {
 		return "", nil
 	}

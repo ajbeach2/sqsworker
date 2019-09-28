@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sns"
 	"github.com/aws/aws-sdk-go/service/sns/snsiface"
@@ -191,6 +192,47 @@ func (w *Worker) Run() {
 		}()
 	}
 	wg.Wait()
+}
+
+// Create SQS Queue by name.
+func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
+	result, err := sqsc.CreateQueue(&sqs.CreateQueueInput{
+		QueueName: aws.String(name),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return *result.QueueUrl, nil
+}
+
+// Get or create an SQS Queue by name.
+func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
+	queueOut, err := sqsc.GetQueueUrl(&sqs.GetQueueUrlInput{
+		QueueName: aws.String(name),
+	})
+
+	if aerr, ok := err.(awserr.Error); ok {
+		switch aerr.Code() {
+		case sqs.ErrCodeQueueDoesNotExist:
+			return CreateQueue(name, sqsc)
+		}
+	}
+
+	return *queueOut.QueueUrl, err
+}
+
+// Create SNS topic by name.
+func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+
+	snsOut, err := snsc.CreateTopic(&sns.CreateTopicInput{
+		Name: aws.String(name),
+	})
+
+	return *snsOut.TopicArn, err
 }
 
 // NewWorker constructor for SQS Worker

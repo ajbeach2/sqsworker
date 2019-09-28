@@ -194,6 +194,7 @@ func (w *Worker) Run() {
 	wg.Wait()
 }
 
+// Create SQS Queue by name.
 func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	result, err := sqsc.CreateQueue(&sqs.CreateQueueInput{
 		QueueName: aws.String(name),
@@ -205,6 +206,7 @@ func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	return *result.QueueUrl, nil
 }
 
+// Get or create an SQS Queue by name.
 func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	queueOut, err := sqsc.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: aws.String(name),
@@ -220,6 +222,7 @@ func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	return *queueOut.QueueUrl, err
 }
 
+// Create SNS topic by name.
 func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
 	if name == "" {
 		return "", nil

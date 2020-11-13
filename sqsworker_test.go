@@ -17,6 +17,17 @@ import (
 	"testing"
 )
 
+var sess *session.Session
+
+const queueBase = "https://sqs.us-east-1.amazonaws.com/88888888888/"
+const workerQueueURL = queueBase + "In"
+const topicBase = "arn:aws:sns:us-east-1:88888888888:"
+const workerTopicARN = topicBase + "Out"
+
+func init() {
+	sess = session.New(&aws.Config{Region: aws.String("us-east-1")})
+}
+
 type MockQueue struct {
 	sqsiface.SQSAPI
 	In      chan string
@@ -25,6 +36,30 @@ type MockQueue struct {
 	receive *sqs.ReceiveMessageOutput
 	Msg     string
 	Error   awserr.Error
+}
+
+type HelloWorld struct {
+}
+
+type NoOP struct {
+}
+
+type ErrorWorker struct {
+}
+
+func (e *ErrorWorker) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+	w.Message = m.Body
+	return errors.New("test error")
+}
+
+func (n *NoOP) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+	*w.Message = ""
+	return nil
+}
+
+func (h *HelloWorld) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+	*w.Message = fmt.Sprint(*m.Body, " ", "world")
+	return nil
 }
 
 func (m *MockQueue) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
@@ -59,13 +94,13 @@ func (m *MockQueue) Close() {
 
 func (m *MockQueue) GetQueueUrl(input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
 	return &sqs.GetQueueUrlOutput{
-		QueueUrl: aws.String(fmt.Sprint("https://sqs.us-east-1.amazonaws.com/88888888888/", *input.QueueName)),
+		QueueUrl: aws.String(fmt.Sprint(queueBase, *input.QueueName)),
 	}, m.Error
 }
 
 func (m *MockQueue) CreateQueue(input *sqs.CreateQueueInput) (*sqs.CreateQueueOutput, error) {
 	return &sqs.CreateQueueOutput{
-		QueueUrl: aws.String(fmt.Sprint("https://sqs.us-east-1.amazonaws.com/88888888888/", *input.QueueName)),
+		QueueUrl: aws.String(fmt.Sprint(queueBase, *input.QueueName)),
 	}, nil
 }
 
@@ -103,7 +138,7 @@ func (t *MockTopic) GetMessage() *string {
 
 func (t *MockTopic) CreateTopic(input *sns.CreateTopicInput) (*sns.CreateTopicOutput, error) {
 	return &sns.CreateTopicOutput{
-		TopicArn: aws.String(fmt.Sprint("arn:aws:sns:us-east-1:88888888888:", *input.Name)),
+		TopicArn: aws.String(fmt.Sprint(topicBase, *input.Name)),
 	}, nil
 }
 
@@ -119,19 +154,15 @@ func BenchmarkWorker(b *testing.B) {
 	queue := GetMockeQueue()
 	topic := GetMockTopic()
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-		*w.Message = ""
-		return nil
-	}
+	handler := &NoOP{}
 
-	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
-		Workers:  1,
-		Logger:   zap.NewNop(),
-		Handler:  handlerFunction,
-		Name:     "TestApp",
+		QueueURL:  workerQueueURL,
+		TopicArn:  workerTopicARN,
+		Workers:   1,
+		Logger:    zap.NewNop(),
+		Processor: handler,
+		Name:      "TestApp",
 	})
 	w.Queue = queue
 	w.Topic = topic
@@ -152,10 +183,7 @@ func TestError(t *testing.T) {
 	queue := GetMockeQueue()
 	done := make(chan bool)
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-		w.Message = m.Body
-		return errors.New("test error")
-	}
+	handler := &ErrorWorker{}
 
 	var callback = func(result *string, err error) {
 		if err == nil {
@@ -164,14 +192,13 @@ func TestError(t *testing.T) {
 		done <- true
 	}
 
-	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		Workers:  1,
-		Handler:  handlerFunction,
-		Logger:   zap.NewNop(),
-		Callback: callback,
-		Name:     "TestApp",
+		QueueURL:  workerQueueURL,
+		Workers:   1,
+		Processor: handler,
+		Logger:    zap.NewNop(),
+		Callback:  callback,
+		Name:      "TestApp",
 	})
 	w.Queue = queue
 
@@ -191,10 +218,7 @@ func TestProcessMessage(t *testing.T) {
 	topic := GetMockTopic()
 	done := make(chan bool)
 
-	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-		*w.Message = fmt.Sprint(*m.Body, " ", "world")
-		return nil
-	}
+	handler := &HelloWorld{}
 
 	var callback = func(result *string, err error) {
 		if *result != "hello world" {
@@ -203,15 +227,14 @@ func TestProcessMessage(t *testing.T) {
 		close(done)
 	}
 
-	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
-		Workers:  1,
-		Logger:   zap.NewNop(),
-		Handler:  handlerFunction,
-		Callback: callback,
-		Name:     "TestApp",
+		QueueURL:  workerQueueURL,
+		TopicArn:  workerTopicARN,
+		Workers:   1,
+		Logger:    zap.NewNop(),
+		Processor: handler,
+		Callback:  callback,
+		Name:      "TestApp",
 	})
 	w.Queue = queue
 	w.Topic = topic
@@ -236,9 +259,9 @@ func TestProcessMessage(t *testing.T) {
 
 func TestGetQueue(t *testing.T) {
 	queue := GetMockeQueue()
-	queueUrl, err := sqsworker.GetOrCreateQueue("In", queue)
-	if queueUrl != "https://sqs.us-east-1.amazonaws.com/88888888888/In" {
-		t.Error("Actual: ", queueUrl, "Expected: ", "https://sqs.us-east-1.amazonaws.com/88888888888/In")
+	queueURL, err := sqsworker.GetOrCreateQueue("In", queue)
+	if queueURL != workerQueueURL {
+		t.Error("Actual: ", queueURL, "Expected: ", workerQueueURL)
 	}
 
 	if err != nil {
@@ -249,9 +272,9 @@ func TestGetQueue(t *testing.T) {
 func TestCreateQueue(t *testing.T) {
 	queue := GetMockeQueue()
 	queue.Error = awserr.New(sqs.ErrCodeQueueDoesNotExist, "Queue Does Not Exists", nil)
-	queueUrl, err := sqsworker.GetOrCreateQueue("In", queue)
-	if queueUrl != "https://sqs.us-east-1.amazonaws.com/88888888888/In" {
-		t.Error("Actual: ", queueUrl, "Expected: ", "https://sqs.us-east-1.amazonaws.com/88888888888/In")
+	queueURL, err := sqsworker.GetOrCreateQueue("In", queue)
+	if queueURL != workerQueueURL {
+		t.Error("Actual: ", queueURL, "Expected: ", workerQueueURL)
 	}
 
 	if err != nil {
@@ -262,8 +285,8 @@ func TestCreateQueue(t *testing.T) {
 func TestGetOrCreateTopic(t *testing.T) {
 	topic := GetMockTopic()
 	topicArn, err := sqsworker.GetOrCreateTopic("Out", topic)
-	if topicArn != "arn:aws:sns:us-east-1:88888888888:Out" {
-		t.Error("Actual: ", topicArn, "Expected: ", "arn:aws:sns:us-east-1:88888888888:Out")
+	if topicArn != workerTopicARN {
+		t.Error("Actual: ", topicArn, "Expected: ", workerTopicARN)
 	}
 
 	if err != nil {

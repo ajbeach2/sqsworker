@@ -14,7 +14,7 @@ Package sqsworker implements a SQS consumer that can process sqs messages from a
 
 ## Overview
 
-The inenteded use of this package is for multiple consumers reading from the same queue. Consumers are represented by structs that implement the Processor interface, which are managed by the Worker type. This package *only* does long-polling based sqs receives
+The inenteded use of this package is for multiple consumers reading from the same queue. Consumers are represented by structs that implement the Processor interface, which are managed by the Worker type. This package *only* does long-polling based sqs receives.
 
 To use this package, you must implement the following interface:
 ```go

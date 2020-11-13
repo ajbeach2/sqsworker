@@ -18,9 +18,9 @@ The inenteded use of this package is for multiple consumers reading from the sam
 
 To use this package, you must implement the following interface:
 ```go
-	type Processor interface {
-		Process(context.Context, *sqs.Message, *sns.PublishInput) error
-	}
+type Processor interface {
+	Process(context.Context, *sqs.Message, *sns.PublishInput) error
+}
 ```
 For example:
 ```go

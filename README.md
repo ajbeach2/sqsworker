@@ -1,5 +1,8 @@
 # sqsworker 
-Concurrent SQS Consumer written on Go. ⚠️WARNING⚠️: This repo is under active development, and there may be rapid and incompatible changes.
+Package sqsworker implements a SQS consumer that can process sqs messages from a SQS queue and optionally send the results to a result topic.
+
+⚠️WARNING⚠️: This repo is under active development, and there may be rapid and incompatible changes.
+ 
 
 [![CircleCI](https://circleci.com/gh/ajbeach2/sqsworker/tree/master.svg?style=svg)](https://circleci.com/gh/ajbeach2/sqsworker/tree/master)
 [![GoDoc](https://godoc.org/github.com/ajbeach2/sqsworker?status.svg)](https://godoc.org/github.com/ajbeach2/sqsworker)
@@ -9,38 +12,18 @@ Concurrent SQS Consumer written on Go. ⚠️WARNING⚠️: This repo is under a
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ajbeach2/sqsworker/blob/master/LICENSE)
 [![Release](https://img.shields.io/github/release/ajbeach2/sqsworker.svg)](https://github.com/ajbeach2/sqsworker/releases)
 
+## Overview
 
+The inenteded use of this package is for multiple consumers reading from the same queue. Consumers are represented by structs that implement the Processor interface, which are managed by the Worker type. This package *only* does long-polling based sqs receives.
 
-
-## Documentation
-
-The Worker type represents a SQS consumer that can process sqs messages from a
-SQS queue and optionally send the results to a sns topic. The intended use is
-multiple concurrent consumers reading from the same queue which execute the
-hander function defined on the Worker struct.
-
-To use his package, first define a handler function. This can also be a closure:
-
+To use this package, you must implement the following interface:
 ```go
-var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-	*w.Message = strings.ToLower(*m.Body)
-	return nil
-}
- ```
-
-The function must match the following type definition:
-
-```go
-type Handler func(context.Context, *sqs.Message, *sns.PublishInput) error
+	type Processor interface {
+		Process(context.Context, *sqs.Message, *sns.PublishInput) error
+	}
 ```
-
-A Worker Struct can be initialized with the NewWorker method, and you may optionally
-define an outbound topic, and number of concurrent workers. If the number of workers
-is not set, the number of workers defaults to runtime.NumCPU().
-
+For example:
 ```go
-package main
-
 import (
 	"context"
 	"github.com/ajbeach2/sqsworker"
@@ -51,32 +34,43 @@ import (
 	"strings"
 )
 
-func ExampleWorker() {
-	var handlerFunction = func(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-		*w.Message = strings.ToLower(*m.Body)
-		return nil
-	}
+type LowerCaseWorker struct {
+}
 
+func (l *LowerCaseWorker) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
+	*w.Message = strings.ToLower(*m.Body)
+	return nil
+}
+
+func ExampleWorker() {
+
+	lowerCaseWorker := &LowerCaseWorker{}
 	sess := session.New(&aws.Config{Region: aws.String("us-east-1")})
 
+	queueURL, _ := sqsworker.GetOrCreateQueue("In", sqs.New(sess))
+	topicArn, _ := sqsworker.GetOrCreateTopic("Out", sns.New(sess))
+
 	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
-		QueueUrl: "https://sqs.us-east-1.amazonaws.com/88888888888/In",
-		TopicArn: "arn:aws:sns:us-east-1:88888888888:Out",
-		Workers:  1,
-		Handler:  handlerFunction,
-		Name:     "TestApp",
+		QueueURL:  queueURL,
+		TopicArn:  topicArn,
+		Workers:   1,
+		Processor: lowerCaseWorker,
+		Name:      "TestApp",
 	})
 
 	w.Run()
 }
-```  
+```
 
-The worker will send messages to the TopicArn topic on succesfull runs.
+A Worker Struct can be initialized with the NewWorker method, and you may optionally
+define an outbound topic, and number of concurrent workers. If the number of workers
+is not set, the number of workers defaults to runtime.NumCPU().  There are helper functions
+provided for getting or creating topcis and queues.
+The worker will send messages to the TopicArn on successful runs.
 
 ## Concurrency
 
-Handler function will be called concurrently by multiple workers depending on the configuration,
-and it is best to ensure that handler function can be executed concurrently, especially if it is a closure and there is shared state.
+The Process function defined by the Processor interface will be called concurrently by multiple workers depending on the configuration. It is best to ensure that Process functions can be executed concurrently.
 
 ## Performance
 

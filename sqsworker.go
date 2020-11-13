@@ -27,22 +27,24 @@ const DefaultVisibilityTimeout = 60
 // DefaultWaitTimeSeconds Long-polling interval for SQS
 const DefaultWaitTimeSeconds = 20
 
-// Handler for SQS consumers
-type Handler func(context.Context, *sqs.Message, *sns.PublishInput) error
+// Handler interface for SQS consumers
+type Processor interface {
+	Process(context.Context, *sqs.Message, *sns.PublishInput) error
+}
 
 // Callback which is passed result from handler on success
 type Callback func(*string, error)
 
 // Worker encapsulates the SQS consumer
 type Worker struct {
-	QueueUrl  string
+	QueueURL  string
 	TopicArn  string
 	Queue     sqsiface.SQSAPI
 	Topic     snsiface.SNSAPI
 	Session   *session.Session
 	Consumers int
 	Logger    *zap.Logger
-	Handler   Handler
+	Processor Processor
 	Callback  Callback
 	Name      string
 	done      chan error
@@ -50,14 +52,14 @@ type Worker struct {
 
 // WorkerConfig settings for Worker to be passed in NewWorker Contstuctor
 type WorkerConfig struct {
-	QueueUrl string
+	QueueURL string
 	TopicArn string
 	// If the number of workers is 0, the number of workers defaults to runtime.NumCPU()
-	Workers  int
-	Handler  Handler
-	Callback Callback
-	Name     string
-	Logger   *zap.Logger
+	Workers   int
+	Processor Processor
+	Callback  Callback
+	Name      string
+	Logger    *zap.Logger
 }
 
 func (w *Worker) logError(msg string, err error) {
@@ -101,7 +103,7 @@ func (w *Worker) sendMessage(msg *sns.PublishInput) error {
 
 func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 	var msgString string
-	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueUrl}
+	deleteInput := &sqs.DeleteMessageInput{QueueUrl: &w.QueueURL}
 	var err error
 	for {
 		select {
@@ -109,7 +111,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 			return
 		case msg := <-in:
 			sendInput := &sns.PublishInput{TopicArn: &w.TopicArn, Message: &msgString}
-			err = w.Handler(ctx, msg, sendInput)
+			err = w.Processor.Process(ctx, msg, sendInput)
 			if err == nil {
 				err = w.sendMessage(sendInput)
 				if err != nil {
@@ -133,7 +135,7 @@ func (w *Worker) consumer(ctx context.Context, in chan *sqs.Message) {
 
 func (w *Worker) producer(ctx context.Context, out chan *sqs.Message) {
 	params := &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(w.QueueUrl),
+		QueueUrl:            aws.String(w.QueueURL),
 		MaxNumberOfMessages: aws.Int64(DefaultMaxNumberOfMessages),
 		VisibilityTimeout:   aws.Int64(DefaultVisibilityTimeout),
 		WaitTimeSeconds:     aws.Int64(DefaultWaitTimeSeconds),
@@ -194,7 +196,7 @@ func (w *Worker) Run() {
 	wg.Wait()
 }
 
-// Create SQS Queue by name.
+// CreateQueue Create queue by name.
 func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	result, err := sqsc.CreateQueue(&sqs.CreateQueueInput{
 		QueueName: aws.String(name),
@@ -206,7 +208,7 @@ func CreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	return *result.QueueUrl, nil
 }
 
-// Get or create an SQS Queue by name.
+// GetOrCreateQueue an SQS Queue by name.
 func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	queueOut, err := sqsc.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: aws.String(name),
@@ -222,7 +224,7 @@ func GetOrCreateQueue(name string, sqsc sqsiface.SQSAPI) (string, error) {
 	return *queueOut.QueueUrl, err
 }
 
-// Create SNS topic by name.
+// GetOrCreateTopic Create SNS topic by name.
 func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
 	if name == "" {
 		return "", nil
@@ -251,14 +253,14 @@ func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	}
 
 	return &Worker{
-		wc.QueueUrl,
+		wc.QueueURL,
 		wc.TopicArn,
 		sqs.New(sess),
 		sns.New(sess),
 		sess,
 		workers,
 		logger,
-		wc.Handler,
+		wc.Processor,
 		wc.Callback,
 		wc.Name,
 		make(chan error),

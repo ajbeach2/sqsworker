@@ -91,9 +91,10 @@ model name	: Intel(R) Core(TM) i5-6600K CPU @ 3.50GHz
 goos: linux
 goarch: amd64
 pkg: github.com/ajbeach2/sqsworker
-BenchmarkWorkerSQSSNS-4   	 1372761	       890 ns/op	      64 B/op	       1 allocs/op
-BenchmarkWorkerSQS-4      	 1842116	       642 ns/op	      64 B/op	       1 allocs/op
+BenchmarkWorkerSQSSNS-4   	 1476417	       862 ns/op	      64 B/op	       1 allocs/op
+BenchmarkWorkerSQS-4      	 2012392	       561 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/ajbeach2/sqsworker	3.955s
+ok  	github.com/ajbeach2/sqsworker	3.835s
+
 
 ```

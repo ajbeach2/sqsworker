@@ -48,12 +48,10 @@ type ErrorWorker struct {
 }
 
 func (e *ErrorWorker) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-	w.Message = m.Body
 	return errors.New("test error")
 }
 
 func (n *NoOP) Process(ctx context.Context, m *sqs.Message, w *sns.PublishInput) error {
-	*w.Message = ""
 	return nil
 }
 
@@ -149,7 +147,7 @@ func GetMockTopic() *MockTopic {
 	}
 }
 
-func BenchmarkWorker(b *testing.B) {
+func BenchmarkWorkerSQSSNS(b *testing.B) {
 	b.ReportAllocs()
 	queue := GetMockeQueue()
 	topic := GetMockTopic()
@@ -177,6 +175,29 @@ func BenchmarkWorker(b *testing.B) {
 	w.Run()
 	queue.Close()
 	topic.Close()
+}
+
+func BenchmarkWorkerSQS(b *testing.B) {
+	b.ReportAllocs()
+	queue := GetMockeQueue()
+	handler := &NoOP{}
+	w := sqsworker.NewWorker(sess, sqsworker.WorkerConfig{
+		QueueURL:  workerQueueURL,
+		Workers:   1,
+		Logger:    zap.NewNop(),
+		Processor: handler,
+		Name:      "TestApp",
+	})
+	w.Queue = queue
+	go func() {
+		for i := 0; i < b.N; i++ {
+			queue.Push("")
+		}
+		w.Close()
+	}()
+	w.Run()
+	queue.Close()
+
 }
 
 func TestError(t *testing.T) {

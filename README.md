@@ -96,5 +96,4 @@ BenchmarkWorkerSQS-4      	 2012392	       561 ns/op	       0 B/op	       0 allo
 PASS
 ok  	github.com/ajbeach2/sqsworker	3.835s
 
-
 ```

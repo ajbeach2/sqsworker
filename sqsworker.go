@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
+	"os"
 	"runtime"
 	"sync"
 )
@@ -244,6 +245,7 @@ func GetOrCreateTopic(name string, snsc snsiface.SNSAPI) (string, error) {
 func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 	var logger *zap.Logger
 	workers := runtime.NumCPU()
+	var queueURL, topicARN = wc.QueueURL, wc.TopicArn
 
 	if wc.Workers != 0 {
 		workers = wc.Workers
@@ -255,9 +257,17 @@ func NewWorker(sess *session.Session, wc WorkerConfig) *Worker {
 		logger = wc.Logger
 	}
 
+	if queueURL == "" {
+		queueURL = os.Getenv("QUEUE_URL")
+	}
+
+	if topicARN == "" {
+		topicARN = os.Getenv("TOPIC_ARN")
+	}
+
 	return &Worker{
-		wc.QueueURL,
-		wc.TopicArn,
+		queueURL,
+		topicARN,
 		sqs.New(sess),
 		sns.New(sess),
 		sess,

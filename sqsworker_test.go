@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
+	"net/http"
 	"testing"
 )
 
@@ -106,7 +107,9 @@ func GetMockeQueue() *MockQueue {
 	return &MockQueue{
 		In:  make(chan string),
 		Out: make(chan string),
-		req: &request.Request{},
+		req: &request.Request{
+			HTTPRequest: &http.Request{},
+		},
 		receive: &sqs.ReceiveMessageOutput{
 			Messages: []*sqs.Message{{Body: nil}},
 		},

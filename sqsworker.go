@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"go.uber.org/zap"
+	"log"
 	"os"
 	"runtime"
 	"sync"
